@@ -39,9 +39,9 @@ import androidx.core.app.NotificationCompat;
 
 import com.limbo.emu.lib.R;
 import com.max2idea.android.limbo.files.FileUtils;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboActivity;
-import com.max2idea.android.limbo.main.LimboSettingsManager;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboActivity;
+import com.max2idea.android.limbo.dontknowhy.LimboSettingsManager;
 import com.max2idea.android.limbo.network.NetworkUtils;
 import com.max2idea.android.limbo.toast.ToastUtils;
 

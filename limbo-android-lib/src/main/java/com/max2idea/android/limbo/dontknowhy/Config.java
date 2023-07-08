@@ -16,7 +16,7 @@ Copyright (C) Max Kastanas 2012
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-package com.max2idea.android.limbo.main;
+package com.max2idea.android.limbo.dontknowhy;
 
 import com.max2idea.android.limbo.links.LinksManager;
 
@@ -74,14 +74,14 @@ public class Config {
     // App config
     public static final String APP_NAME = "Limbo Emulator";
 
-    public static final String defaultDNSServer = "8.8.8.8";
+    public static final String defaultDNSServer = "114.114.114.114";
     // App Config
     public static final String downloadLink = "https://github.com/limboemu/limbo/wiki/Downloads";
     public static final String guidesLink = "https://github.com/limboemu/limbo/wiki/Guides";
-    public static final String kvmLink = "https://github.com/limboemu/limbo/wiki/KVM";
+    public static final String kvmLink = "https://baike.baidu.com/item/%E7%BB%9F%E4%B8%80%E5%8F%AF%E6%89%A9%E5%B1%95%E5%9B%BA%E4%BB%B6%E6%8E%A5%E5%8F%A3/22786233";
     public static final String faqLink = "https://github.com/limboemu/limbo/wiki/FAQ";
     public static final String toolsLink = "https://github.com/limboemu/limbo/wiki/Tools";
-    public static final String newVersionLink = "https://raw.githubusercontent.com/limboemu/limbo/master/VERSION";
+    public static final String newVersionLink = "https://raw.githubusercontents.com/limboemu/limbo/master/VERSION";
     public static final String otherOSLink = "https://github.com/limboemu/limbo/wiki/Other-Operating-Systems";
 
     public static final boolean enableKeyboardLayoutOption = true;
@@ -143,7 +143,7 @@ public class Config {
     public static boolean showToast = false;
     public static boolean closeFileDescriptors = true;
     //XXX: qemu vvfat is buggy so we disable
-    public static boolean enableSharedFolder = false;
+    public static boolean enableSharedFolder = true;
 
     public static String machineFolder = "machines/";
     public static String logFilePath = null;
@@ -152,7 +152,7 @@ public class Config {
     //QMP
     public static String QMPServer = "127.0.0.1";
     public static int QMPPort = 4444;
-    public static int MAX_DISPLAY_REFRESH_RATE = 100; //Hz
+    public static int MAX_DISPLAY_REFRESH_RATE = 120; //Hz
     // VNC Defaults
     public static String defaultVNCHost = "127.0.0.1";
     //It seems that new versions of qemu expect a relative number

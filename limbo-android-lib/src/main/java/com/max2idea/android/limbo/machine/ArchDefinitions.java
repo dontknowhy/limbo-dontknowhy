@@ -22,8 +22,8 @@ import android.content.Context;
 
 import com.limbo.emu.lib.R;
 import com.max2idea.android.limbo.install.Installer;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboApplication;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboApplication;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,7 +48,6 @@ public class ArchDefinitions {
         switch (LimboApplication.arch) {
             case x86:
             case x86_64:
-                networkCards.add("Default");
                 networkCards.addAll(commonNetworkCards);
                 break;
             case arm:
@@ -82,6 +81,7 @@ public class ArchDefinitions {
         if (LimboApplication.arch == Config.Arch.x86 || LimboApplication.arch == Config.Arch.x86_64) {
             vgaValues.add("cirrus");
             vgaValues.add("vmware");
+            vgaValues.add("virtio");
         }
 
         //override vga for sun4m (32bit) machines to cg3
@@ -89,7 +89,7 @@ public class ArchDefinitions {
             vgaValues.add("cg3");
         }
 
-        if (LimboApplication.arch == Config.Arch.arm || LimboApplication.arch == Config.Arch.arm64) {
+        if (LimboApplication.arch == Config.Arch.arm || LimboApplication.arch == Config.Arch.arm64 || LimboApplication.arch == Config.Arch.x86 || LimboApplication.arch == Config.Arch.x86_64) {
             vgaValues.add("virtio-gpu-pci");
         }
 
@@ -103,14 +103,15 @@ public class ArchDefinitions {
 
     public static ArrayList<String> getKeyboardValues(Context context) {
         ArrayList<String> arrList = new ArrayList<>();
+        arrList.add("zh-cn");
         arrList.add("en-us");
         return arrList;
     }
 
     public static ArrayList<String> getMouseValues(Context context) {
         ArrayList<String> arrList = new ArrayList<>();
-        arrList.add("ps2");
         arrList.add("usb-mouse");
+        arrList.add("ps2");
         arrList.add("usb-tablet" + " " + context.getString(R.string.fixesMouseParen));
         return arrList;
     }
@@ -156,8 +157,9 @@ public class ArchDefinitions {
         }
 
         if (LimboApplication.arch == Config.Arch.x86 || LimboApplication.arch == Config.Arch.x86_64
-                || LimboApplication.arch == Config.Arch.arm || LimboApplication.arch == Config.Arch.arm64)
-            arrList.add("host");
+                || LimboApplication.arch == Config.Arch.arm || LimboApplication.arch == Config.Arch.arm64) {
+            return arrList;
+        }
         return arrList;
     }
 
@@ -166,7 +168,6 @@ public class ArchDefinitions {
         switch (LimboApplication.arch) {
             case x86:
             case x86_64:
-                arrList.add("Default");
                 arrList.addAll(Arrays.asList(Installer.getAttrs(context, R.raw.x86_machine_types)));
                 break;
             case arm:

@@ -31,10 +31,10 @@ import com.max2idea.android.limbo.machine.MachineAction;
 import com.max2idea.android.limbo.machine.MachineController;
 import com.max2idea.android.limbo.machine.MachineExecutor;
 import com.max2idea.android.limbo.machine.MachineProperty;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboApplication;
-import com.max2idea.android.limbo.main.LimboSDLActivity;
-import com.max2idea.android.limbo.main.LimboSettingsManager;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboApplication;
+import com.max2idea.android.limbo.dontknowhy.LimboSDLActivity;
+import com.max2idea.android.limbo.dontknowhy.LimboSettingsManager;
 import com.max2idea.android.limbo.qmp.QmpClient;
 import com.max2idea.android.limbo.toast.ToastUtils;
 
@@ -250,6 +250,14 @@ private String getQemuLibrary() {
         if (getSoundCard() != null) {
             paramsList.add("-soundhw");
             paramsList.add(getSoundCard());
+            paramsList.add("-global");
+            paramsList.add("intel-hda.msi=auto");
+            paramsList.add("-global");
+            paramsList.add("hda-duplex.use-timer=true");
+            paramsList.add("-global");
+            paramsList.add("hda-duplex.cad=4294967295");
+            paramsList.add("-global");
+            paramsList.add("hda-duplex.mixer=true");
         }
     }
 
@@ -297,6 +305,67 @@ private String getQemuLibrary() {
 
         paramsList.add("-rtc");
         paramsList.add("base=localtime");
+        paramsList.add("-boot");
+        paramsList.add("menu=on,strict=off");
+        paramsList.add("-no-fd-bootchk");
+        paramsList.add("-msg");
+        paramsList.add("timestamp=off");
+        paramsList.add("-no-hpet");
+        paramsList.add("-nodefaults");
+        paramsList.add("-rtc");
+        paramsList.add("base=localtime,clock=host");
+        paramsList.add("-audiodev");
+        paramsList.add("sdl,id=sdl,in.channels=2,in.frequency=44100,out.buffer-length=12000,in.format=s16,in.voices=2");
+        paramsList.add("-name");
+        paramsList.add("Limbo x86");
+        paramsList.add("-global");
+        paramsList.add("ide-hd.physical_block_size=1024");
+        paramsList.add("-global");
+        paramsList.add("ide-cd.physical_block_size=1024");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.physical_block_size=1024");
+        paramsList.add("-global");
+        paramsList.add("ide-hd.logical_block_size=512");
+        paramsList.add("-global");
+        paramsList.add("ide-cd.logical_block_size=512");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.logical_block_size=512");
+        paramsList.add("-global");
+        paramsList.add("ide-hd.write-cache=on");
+        paramsList.add("-global");
+        paramsList.add("ide-cd.write-cache=on");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.write-cache=on");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.ats=on");
+        paramsList.add("-global");
+        paramsList.add("ide-hd.share-rw=false");
+        paramsList.add("-global");
+        paramsList.add("ide-cd.share-rw=false");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.queue-size=1024");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.use-disabled-flag=true");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.use-started=true");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.seg-max-adjust=true");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.write-zeroes=true");
+        paramsList.add("-global");
+        paramsList.add("virtio-blk-pci.scsi=off");
+        paramsList.add("-global");
+        paramsList.add("ich9-ahci.x-pcie-extcap-init=true");
+        paramsList.add("-global");
+        paramsList.add("ich9-ahci.x-pcie-lnksta-dllla=true");
+        paramsList.add("-global");
+        paramsList.add("ide-hd.model=Seagate ST3320620A");
+        paramsList.add("-global");
+        paramsList.add("ide-hd.serial=ST3320620A");
+        paramsList.add("-global");
+        paramsList.add("ide-cd.model=SONY CRX230A");
+        paramsList.add("-global");
+        paramsList.add("ide-cd.serial=CRX230A");
 
         if (!Config.enableDefaultDevices)
             paramsList.add("-nodefaults");
@@ -310,11 +379,11 @@ private String getQemuLibrary() {
         // doesn't work for x86 guests yet
         if (getMachine().getCpuNum() > 1) {
             paramsList.add("-smp");
-            paramsList.add(getMachine().getCpuNum() + "");
+            paramsList.add(getMachine().getCpuNum() + ",cores=" + getMachine().getCpuNum());
         }
         if (getMachineType() != null && !getMachineType().equals("Default")) {
             paramsList.add("-M");
-            paramsList.add(getMachineType());
+            paramsList.add(getMachineType() + ",vmport=off,kernel-irqchip=off,dump-guest-core=off,mem-merge=off,hmat=off");
         }
 
         //FIXME: something is wrong with quoting that doesn't let sparc qemu find the cpu def
@@ -332,14 +401,16 @@ private String getQemuLibrary() {
                 else if (LimboApplication.arch == Config.Arch.x86_64)
                     cpu = "qemu64";
             }
-            cpu += ",-tsc";
+            cpu += ",l3-cache=true,cid=off,cldemote=off,clzero=off,cmp-legacy=off,cmp_legacy=off,core-capability=off,amd-no-ssb=off,amd-ssbd=off,amd-stibp=off,ace2-en=off,ace2=off,adx=on,topoext=off,osvw=off,misalignsse=off,fxsr-opt=off,rdpid=off,umip=off,xsaves=off,sha-ni=off,lm=on,syscall=on,aes=off,vaes=off,ss=on,sse=on,sse2=on,sse4.1=on,sse4.2=off,sse4a=off,ssse3=off,gfni=off,fpu=on,vpclmulqdq=off,vmx=off,hypervisor=off,fsrm=off,decodeassists=off,ds-cpl=off,ds_cpl=off,dtes64=off,enforce=off,erms=off,est=off,extapic=off,f16c=off,perfctr-core=off,xsaveerptr=off,wbnoinvd=off,amd-stibp=off,ibpb=off,nrip-save=off,svm=off,acpi=on,lmce=on,fma=off,ht=on,abm=on,check=off,vme=off,full-cpuid-auto-level=on,fill-mtrr-mask=on,mmx=on,fma4=off,fma=off,vmware-cpuid-freq=false,host-phys-bits=false,mds-no=off,pcid=off,x2apic=off,tsc-deadline=off,invpcid=off,rdseed=off,spec-ctrl=off,arch-capabilities=off,ssbd=off,3dnowprefetch=off,3dnowext=off,xsavec=off,rdctl-no=off,ibrs-all=off,skip-l1dfl-vmentry=off,tcg-cpuid=off";
         }
 
         if (getMachine().getDisableAcpi() != 0) {
-            paramsList.add("-no-acpi"); //disable ACPI
+            paramsList.add("-pflash");
+            paramsList.add("edk2-i386-code.fd");
         }
         if (getMachine().getDisableHPET() != 0) {
-            paramsList.add("-no-hpet"); //        disable HPET
+            paramsList.add("-acpitable");
+            paramsList.add("file=battery.dat");
         }
 
         if (cpu != null && !cpu.equals("Default")) {
@@ -358,12 +429,13 @@ private String getQemuLibrary() {
         // this is due to QEMU applying the first instance of this option
         // so the extra params cannot override it.
         if (getMachine().getEnableKVM() != 0) {
-            paramsList.add("-enable-kvm");
+            paramsList.add("-pflash");
+            paramsList.add("edk2-x86_64-code.fd");
         } else {
             paramsList.add("-accel");
             String tcgParams = "tcg";
             if (getMachine().getEnableMTTCG() != 0) {
-                tcgParams += ",thread=multi";
+                tcgParams += ",thread=multi,tb-size=2048";
             } else {
                 tcgParams += ",thread=single";
             }
@@ -393,6 +465,7 @@ private String getQemuLibrary() {
             paramsList.add("-net");
             if (network.equals("user")) {
                 String netParams = network;
+                netParams+= ",ipv4=on,ipv6=off";
                 String hostFwd = getHostFwd();
                 if (hostFwd != null) {
 
@@ -429,6 +502,16 @@ private String getQemuLibrary() {
             if (!networkCard.equals("Default"))
                 nicParams += (",model=" + networkCard);
             paramsList.add(nicParams);
+            paramsList.add("-global");
+            paramsList.add("e1000.mac=52:54:98:76:54:32");
+            paramsList.add("-global");
+            paramsList.add("e1000e.mac=52:54:98:76:54:32");
+            paramsList.add("-global");
+            paramsList.add("rtl8139.mac=52:54:98:76:54:32");
+            paramsList.add("-global");
+            paramsList.add("virtio-net-pci.mac=52:54:98:76:54:32");
+            paramsList.add("-global");
+            paramsList.add("ne2k_pci.mac=52:54:98:76:54:32");
         }
     }
 
@@ -469,11 +552,95 @@ private String getQemuLibrary() {
             } else if (getMachine().getVga().equals("virtio-gpu-pci")) {
                 paramsList.add("-device");
                 paramsList.add(getMachine().getVga());
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.xres=1280");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.yres=800");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.vectors=3");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.indirect_desc=on");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.edid=on");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.max_hostmem=512M");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.max_outputs=1");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.virtio-pci-bus-master-bug-migration=off");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.event_idx=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.notify_on_empty=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.any_layout=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.iommu_platform=false");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.packed=false");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.use-started=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-gpu-pci.use-disabled-flag=true");
             } else if (getMachine().getVga().equals("nographic")) {
                 paramsList.add("-nographic");
             } else {
                 paramsList.add("-vga");
                 paramsList.add(getMachine().getVga());
+                paramsList.add("-global");
+                paramsList.add("VGA.xmax=1920");
+                paramsList.add("-global");
+                paramsList.add("VGA.xres=2400");
+                paramsList.add("-global");
+                paramsList.add("VGA.ymax=1920");
+                paramsList.add("-global");
+                paramsList.add("VGA.yres=2400");
+                paramsList.add("-global");
+                paramsList.add("VGA.romfile=vgabios.bin");
+                paramsList.add("-global");
+                paramsList.add("VGA.edid=on");
+                paramsList.add("-global");
+                paramsList.add("VGA.vgamem_mb=512");
+                paramsList.add("-global");
+                paramsList.add("VGA.global-vmstate=true");
+                paramsList.add("-global");
+                paramsList.add("VGA.qemu-extended-regs=off");
+                paramsList.add("-global");
+                paramsList.add("VGA.rombar=1");
+                paramsList.add("-global");
+                paramsList.add("VGA.mmio=off");
+                paramsList.add("-global");
+                paramsList.add("VGA.multifunction=off");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.xres=1280");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.yres=800");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.vectors=3");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.indirect_desc=on");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.edid=on");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.max_hostmem=512M");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.max_outputs=1");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.virtio-pci-bus-master-bug-migration=off");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.event_idx=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.notify_on_empty=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.any_layout=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.iommu_platform=false");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.packed=false");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.use-started=true");
+                paramsList.add("-global");
+                paramsList.add("virtio-vga.use-disabled-flag=true");
             }
         }
     }

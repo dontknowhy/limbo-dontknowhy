@@ -16,7 +16,7 @@ Copyright (C) Max Kastanas 2012
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-package com.max2idea.android.limbo.main;
+package com.max2idea.android.limbo.dontknowhy;
 
 import android.Manifest;
 import android.app.Activity;
@@ -177,7 +177,7 @@ public class LimboFileManager extends ListActivity {
     }
 
     public static Intent getFileManIntent(Activity activity) {
-        return new Intent(activity, com.max2idea.android.limbo.main.LimboFileManager.class);
+        return new Intent(activity, com.max2idea.android.limbo.dontknowhy.LimboFileManager.class);
     }
 
     protected static void promptOpenFileASF(Activity context, FileType fileType, int requestCode, String lastDir) {

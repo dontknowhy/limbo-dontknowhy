@@ -1,3 +1,76 @@
+﻿* Limbo Hybrid v6.0.1-gen2.2.4x2-M2-build6.0.1_12_rev1_23.5.27_x86
+用Android Studio重新编译
+更改了RAM，使其阳间
+更新了新建磁盘的选项，显卡选项，网卡型号选项
+由于重新编译所以汉化没了，会有变动
+
+*Limbo Hybrid v6.0.1-gen2.2.4x2-M2-build6.0.1_12_rev1_23.5.27_x86
+既然都有UEFI支持了我改成Hybrid合理吧🐶
+将磁盘缓存默认开启，所以没法关掉
+默认更改了IDE磁盘和光驱型号，现在会显示分别显示为Seagate ST3320620A和SONY CRX230A（两个我随便网上找的🐶）
+
+*Limbo Leagacy v6.0.1-gen2.2.4x2-M1-build6.0.1_11_rev1_23.5.25_x86
+据小道消息，有些人喜欢ne2k网卡，所以恢复ne2k_pci网卡
+去除芯片组类型的默认选项，因为就两种机型选
+去除了内存的4M选项
+更改USB设备选项
+更改芯片组设置选项
+
+*Limbo Leagacy v6.0.1-gen2.2.3x4-M2
+混乱的版本命名
+优化了内存大小选择界面
+更新了一些翻译文本以及优化了一些小细节
+更改了配置写出机制，目前可以不需要担心与原版Limbo的兼容性
+去除了x86和x64的架构原生支持
+
+*Limbo Leagacy v6.0.1-gen2.2.3x4
+修复某些SB不想选网卡又勾上的jb问题
+添加了（没啥用）zh-cn的键盘选项
+
+*Limbo Leagacy v6.0.1-gen2.2.3x2
+添加了来自小白之家的电池伪装玩意
+反向汉化声卡列表以避免出现声卡变无的情况
+
+*Limbo Leagacy v6.0.1-gen2.2.3
+不要问gen2.2.2在哪里
+不要问为什么文档忽然换成中文但不翻译
+更改了启动设备文本防止抓瞎
+在VNC视图现在会显示成QEMU(Limbo x86)
+更新了CPU的L3缓存选项
+更新了磁盘读写缓存选项
+
+* Limbo Leagacy v6.0.1-gen2.2.1
+Brand new SeaBIOS and standard VGA BIOS from XBZJ
+Initial graphics card option update
+Usb-ehci will now only enable with usb-tablet 
+Removed scsi bus option because it isn't work and i don't want to fix it
+
+* Limbo Leagacy v6.0.1-gen2.1.2
+Changed SDL's buffer to 12000
+Fixed disk cache problem
+ 
+* Limbo Leagacy v6.0.1-gen2.1.1
+Replaced -smp with -smp (CPU cores),cores=(CPU cores)
+
+* Limbo Leagacy v6.0.1-gen2.1
+Added virtio-gpu-pci option
+Added smbios support
+Added UUID modification support
+Disabled Kernel Boot options
+
+* Limbo Leagacy v6.0.1-gen2
+Changed some Check box's text and it's command line
+Added more Chinese
+
+* Limbo Leagacy v114
+Added almost full Chinese support
+Build in UEFI support(efi-32.fd efi-32-vars.fd efi-64.fd)(From OVMF)
+Added virtio-vga support
+Added some CPU option
+Added e1000e NIC
+Removed some unnecessary Sound Cards
+Changed create virtual disks menu and removed some non-modern disk size
+
 * Limbo Legacy v6.0.1
 Added qemu disk cache option
 Added qemu hdd interfaces (tap on the disk icon)
@@ -368,3 +441,4 @@ Limbo v0.9.1b (Aug 13, 2012)
 - Save/Load VM Snapshot/State.
 - QEMU Monitor
 - UI Configurable parameters for device management
+

@@ -29,8 +29,8 @@ import android.widget.TextView;
 import com.limbo.emu.lib.R;
 import com.max2idea.android.limbo.files.FileUtils;
 import com.max2idea.android.limbo.machine.Machine.FileType;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboFileManager;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboFileManager;
 
 import java.io.BufferedReader;
 import java.io.IOException;

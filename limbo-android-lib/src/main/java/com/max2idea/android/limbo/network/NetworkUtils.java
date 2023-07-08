@@ -23,8 +23,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboSettingsManager;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboSettingsManager;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

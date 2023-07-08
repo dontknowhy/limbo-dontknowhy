@@ -1,13 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 29
-    buildToolsVersion '29.0.3'
+    compileSdkVersion 31
 
     defaultConfig {
-        applicationId "com.limbo.emu.main"
-        minSdkVersion 21
-        targetSdkVersion 29
+        applicationId "com.limbo.emu.dontknowhy"
+        minSdk 24
+        targetSdkVersion 31
         ndk { abiFilters "armeabi-v7a","arm64-v8a", "x86", "x86_64" }
     }
     buildTypes {
@@ -19,15 +18,16 @@ android {
             jniDebuggable true
         }
     }
-    lintOptions {
-        abortOnError false
-        disable 'MissingTranslation'
-    }
 
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
         }
+    }
+    namespace 'com.limbo.emu.dontknowhy'
+    lint {
+        abortOnError false
+        disable 'MissingTranslation'
     }
 
 }

@@ -16,7 +16,7 @@ Copyright (C) Max Kastanas 2012
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-package com.max2idea.android.limbo.main;
+package com.max2idea.android.limbo.dontknowhy;
 
 import android.app.Application;
 import android.content.Context;
@@ -131,7 +131,7 @@ public class LimboApplication extends Application {
     }
 
     public static ViewListener getViewListener() {
-        return Dispatcher.getInstance();
+        return (ViewListener) Dispatcher.getInstance();
     }
 
     public static String getBasefileDir() {

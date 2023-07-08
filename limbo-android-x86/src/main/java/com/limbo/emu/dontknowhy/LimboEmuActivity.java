@@ -1,12 +1,12 @@
-package com.limbo.emu.main;
+package com.limbo.emu.dontknowhy;
 
 import android.os.Bundle;
 
-import com.max2idea.android.limbo.log.Logger;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboActivity;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboActivity;
+import com.max2idea.android.limbo.dontknowhy.LimboApplication;
 import com.max2idea.android.limbo.links.LinksManager;
-import com.max2idea.android.limbo.main.LimboApplication;
+import com.max2idea.android.limbo.log.Logger;
 
 public class LimboEmuActivity extends LimboActivity {
 

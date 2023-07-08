@@ -29,9 +29,9 @@ import android.util.Log;
 import android.widget.TextView;
 
 import com.limbo.emu.lib.R;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboApplication;
-import com.max2idea.android.limbo.main.LimboSettingsManager;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboApplication;
+import com.max2idea.android.limbo.dontknowhy.LimboSettingsManager;
 import com.max2idea.android.limbo.network.NetworkUtils;
 
 /** Software Update notifier for checking if a new version is published.

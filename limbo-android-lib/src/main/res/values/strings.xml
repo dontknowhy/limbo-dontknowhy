@@ -170,8 +170,8 @@
     <string name="deleteVMWarning">Delete VM? Only machine definition and state will be deleted, disk images files will not be deleted</string>
     <string name="NoMachineSelected">No Machine selected</string>
     <string name="multipleVCPU">Multiple vCPUs</string>
-    <string name="multipleVCPUWarning">Warning! Setting Multiple Virtual CPUs will NOT result in additional performance unless you use KVM or MTTCG. Your device might even be slow or the Guest OS might hang so it is advised to use 1 CPU. \n\n</string>
-    <string name="disableTSCInstructions">If your guest OS is not able to boot check option \'Disable TSC\' and restart the VM.</string>
+    <string name="multipleVCPUWarning">Warning! Setting Multiple Virtual CPUs will NOT result in additional performance unless you use MTTCG. Your device might even be slow or the Guest OS might hang so it is advised to use 1 CPU. \n\n</string>
+    <string name="disableTSCInstructions">If your guest OS is not able to boot check option \'Enable l3 cache\' and restart the VM.</string>
     <string name="DoYouWantToContinue">Do you want to continue?</string>
     <string name="vCPUHelp">vCPU Help</string>
     <string name="Auto">Auto</string>
@@ -258,8 +258,7 @@
     <string name="VNCPasswordMissing">VNC Password is missing in Settings!</string>
     <string name="VNCPasswordNotEnabledWarning">VNC Password is not enabled! Any application on your device can view and control your Virtual Machine! Make sure you trust your apps on your device otherwise set a password in settings. Continue?</string>
     <string name="ExternalVNCEnabledWarning">You have enabled External VNC. Anyone on the same network could read your VNC password and control your virtual machine! Make sure you trust your network. Continue?</string>
-    <string name="EnableKVMWarning">Warning! You will need an Android Device with the same architecture as the emulated Guest. Make sure you have installed an Android kernel with KVM support. If you do not know what this is press Cancel now.\n\nIf you experience crashes disable this option. Do you want to continue?</string>
-    <string name="EnableKVM">Enable KVM</string>
+    <string name="EnableKVMWarning">Warning! You need to make sure that your guest OS supports UEFI.\n\nIf your system is unbootable,please disable this option. Do you want to continue?</string>
     <string name="server">Server</string>
     <string name="ExtraParams">Extra Params</string>
     <string name="MachineResolution">Machine resolution</string>
@@ -304,7 +303,7 @@
     <string name="CHANGELOG">CHANGELOG</string>
     <string name="WriteAccess">Write Access</string>
     <string name="FilePathNotSupportedWarning">File path is not supported. Make sure you choose a file/directory from your internal storage or external sd card. Root and Download Directories are not supported.</string>
-    <string name="KVMHelp">KVM Help</string>
+    <string name="KVMHelp">UEFI HELP</string>
     <string name="FullAccessWarning">Warning! Providing FULL ACCESS to the write disk is discouraged!\n\nYou either request for Shared Access to the local drive or your device does not have Android Storage Framework implemented. If you understand the risks press OK to continue</string>
     <string name="OkIUnderstand">OK, I understand</string>
     <string name="SendText">Send Text</string>
@@ -372,4 +371,5 @@
     <string name="IgnoreBreakpointInvalidationSummary">Ignore Breakpoint Invalidation</string>
     <string name="ImportBIOSFile">Import BIOS</string>
     <string name="importBIOSInstructions">Select a BIOS file (bin, rom, etc..) to import.</string>
+    <string name="EnableKVM">Enable UEFI(64)</string>
 </resources>

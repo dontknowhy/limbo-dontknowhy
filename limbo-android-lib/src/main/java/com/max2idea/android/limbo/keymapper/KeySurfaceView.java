@@ -34,7 +34,7 @@ import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
-import com.max2idea.android.limbo.main.Config;
+import com.max2idea.android.limbo.dontknowhy.Config;
 
 import java.util.ArrayList;
 import java.util.HashMap;

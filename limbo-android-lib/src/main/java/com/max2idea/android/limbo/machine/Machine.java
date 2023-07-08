@@ -18,8 +18,8 @@
  */
 package com.max2idea.android.limbo.machine;
 
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboApplication;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboApplication;
 
 import java.util.Observable;
 

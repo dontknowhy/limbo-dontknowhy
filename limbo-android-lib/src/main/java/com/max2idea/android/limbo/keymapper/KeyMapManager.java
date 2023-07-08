@@ -40,8 +40,8 @@ import android.widget.SimpleAdapter;
 
 import com.limbo.emu.lib.R;
 import com.max2idea.android.limbo.keyboard.KeyboardUtils;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboSettingsManager;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboSettingsManager;
 import com.max2idea.android.limbo.screen.ScreenUtils;
 import com.max2idea.android.limbo.toast.ToastUtils;
 

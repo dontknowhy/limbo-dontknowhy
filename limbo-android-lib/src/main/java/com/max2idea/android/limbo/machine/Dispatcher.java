@@ -18,7 +18,7 @@ Copyright (C) Max Kastanas 2012
  */
 package com.max2idea.android.limbo.machine;
 
-import com.max2idea.android.limbo.main.ViewListener;
+import com.max2idea.android.limbo.dontknowhy.ViewListener;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

@@ -1,8 +1,5 @@
 e1000
-pcnet
+e1000e
 rtl8139
-ne2k_pci
-i82551
-i82557b
-i82559er
 virtio
+ne2k_pci

@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-package com.max2idea.android.limbo.main;
+package com.max2idea.android.limbo.dontknowhy;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -522,11 +522,16 @@ public class LimboActivity extends AppCompatActivity
             }
         });
 
-        mDisableACPI.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+            mDisableACPI.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton viewButton, boolean isChecked) {
                 if (getMachine() == null)
                     return;
-                notifyFieldChange(MachineProperty.DISABLE_ACPI, isChecked);
+                if (isChecked) {
+                    notifyFieldChange(MachineProperty.DISABLE_ACPI, true);
+                    mEnableKVM.setChecked(false);
+                } else {
+                    notifyFieldChange(MachineProperty.DISABLE_ACPI, isChecked);
+                }
             }
         });
 
@@ -609,6 +614,7 @@ public class LimboActivity extends AppCompatActivity
                     return;
                 if (isChecked) {
                     promptKVM();
+                    promptACPI();
                 } else {
                     notifyFieldChange(MachineProperty.ENABLE_KVM, isChecked);
                 }
@@ -673,11 +679,19 @@ public class LimboActivity extends AppCompatActivity
         }
     }
 
+    private void promptACPI() {
+        DialogInterface.OnClickListener okListener = new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                notifyFieldChange(MachineProperty.DISABLE_ACPI, true);
+                mEnableKVM.setChecked(false);
+            }
+        };
+    }
     private void promptKVM() {
         DialogInterface.OnClickListener okListener = new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
                 notifyFieldChange(MachineProperty.ENABLE_KVM, true);
-                mEnableMTTCG.setChecked(false);
+                mDisableACPI.setChecked(false);
             }
         };
 
@@ -709,7 +723,6 @@ public class LimboActivity extends AppCompatActivity
         DialogInterface.OnClickListener okListener = new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
                 notifyFieldChange(MachineProperty.ENABLE_MTTCG, true);
-                mEnableKVM.setChecked(false);
             }
         };
         DialogInterface.OnClickListener cancelListener =
@@ -809,7 +822,6 @@ public class LimboActivity extends AppCompatActivity
 
         final String[] items = {
                 "ide",
-                "scsi",
                 "virtio"
         };
         final AlertDialog.Builder mBuilder = new AlertDialog.Builder(this);
@@ -1866,13 +1878,13 @@ public class LimboActivity extends AppCompatActivity
             if (mEnableMTTCG.isChecked())
                 text = appendOption("Enable MTTCG", text);
             if (mEnableKVM.isChecked())
-                text = appendOption("Enable KVM", text);
+                text = appendOption("Enable UEFI(64)", text);
             if (mDisableACPI.isChecked())
-                text = appendOption("Disable ACPI", text);
+                text = appendOption("Enable UEFI(32)", text);
             if (mDisableHPET.isChecked())
-                text = appendOption("Disable HPET", text);
+                text = appendOption("Fake Battery", text);
             if (mDisableTSC.isChecked())
-                text = appendOption("Disable TSC", text);
+                text = appendOption("Enable l3 cache", text);
             mCPUSectionSummary.setText(text);
         }
     }
@@ -2206,11 +2218,11 @@ public class LimboActivity extends AppCompatActivity
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
 
         String[] arraySpinner = new String[5];
-        arraySpinner[0] = "1GB (Growable)";
-        arraySpinner[1] = "2GB (Growable)";
-        arraySpinner[2] = "4GB (Growable)";
-        arraySpinner[3] = "10 GB (Growable)";
-        arraySpinner[4] = "20 GB (Growable)";
+        arraySpinner[0] = "4GB (Growable)";
+        arraySpinner[1] = "16GB (Growable)";
+        arraySpinner[2] = "32GB (Growable)";
+        arraySpinner[3] = "64GB (Growable)";
+        arraySpinner[4] = "128GB (Growable)";
 
         ArrayAdapter<?> sizeAdapter = new ArrayAdapter<Object>(this, R.layout.custom_spinner_item, arraySpinner);
         sizeAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
@@ -2235,17 +2247,17 @@ public class LimboActivity extends AppCompatActivity
                 }
 
                 int sizeSel = size.getSelectedItemPosition();
-                String templateImage = "hd1g.qcow2";
+                String templateImage = "hd4g.qcow2";
                 if (sizeSel == 0) {
-                    templateImage = "hd1g.qcow2";
-                } else if (sizeSel == 1) {
-                    templateImage = "hd2g.qcow2";
-                } else if (sizeSel == 2) {
                     templateImage = "hd4g.qcow2";
+                } else if (sizeSel == 1) {
+                    templateImage = "hd16g.qcow2";
+                } else if (sizeSel == 2) {
+                    templateImage = "hd32g.qcow2";
                 } else if (sizeSel == 3) {
-                    templateImage = "hd10g.qcow2";
+                    templateImage = "hd64g.qcow2";
                 } else if (sizeSel == 4) {
-                    templateImage = "hd20g.qcow2";
+                    templateImage = "hd128g.qcow2";
                 }
 
                 String image = imageNameView.getText().toString();
@@ -2429,11 +2441,15 @@ public class LimboActivity extends AppCompatActivity
     }
 
     private void populateRAM() {
-        String[] arraySpinner = new String[4 * 256];
-        arraySpinner[0] = 4 + "";
-        for (int i = 1; i < arraySpinner.length; i++) {
-            arraySpinner[i] = i * 8 + "";
-        }
+        ArrayList<String>RAMValuesList = new ArrayList<>();
+        RAMValuesList.add("16");
+        RAMValuesList.add("32");
+        RAMValuesList.add("256");
+        RAMValuesList.add("512");
+        RAMValuesList.add("1024");
+        RAMValuesList.add("2048");
+        RAMValuesList.add("4096");
+        String[] arraySpinner = RAMValuesList.toArray(new String[0]);
         ArrayAdapter<String> ramAdapter = new ArrayAdapter<>(this, R.layout.custom_spinner_item, arraySpinner);
         ramAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
         mRamSize.setAdapter(ramAdapter);
