@@ -226,7 +226,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="right|center_vertical"
                     android:gravity="right|center_vertical"
-                    android:text="Enable KVM"
+                    android:text="Enable UEFI(64)"
                     android:textSize="15sp" />
 
                 <CheckBox
@@ -260,7 +260,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="right|center_vertical"
                     android:gravity="right|center_vertical"
-                    android:text="Disable HPET"
+                    android:text="Fake Battery"
                     android:textSize="15sp" />
 
                 <CheckBox
@@ -288,7 +288,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="right|center_vertical"
                     android:gravity="right|center_vertical"
-                    android:text="Disable TSC"
+                    android:text="Enable l3 cache"
                     android:textSize="15sp" />
 
                 <CheckBox
@@ -323,7 +323,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="right|center_vertical"
                     android:gravity="right|center_vertical"
-                    android:text="Disable ACPI"
+                    android:text="Enable UEFI(32)"
                     android:textSize="15sp" />
 
                 <CheckBox

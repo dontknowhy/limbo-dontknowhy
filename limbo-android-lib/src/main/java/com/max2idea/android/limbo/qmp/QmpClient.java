@@ -22,8 +22,8 @@ import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.util.Log;
 
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboApplication;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboApplication;
 import com.max2idea.android.limbo.toast.ToastUtils;
 
 import org.json.JSONObject;

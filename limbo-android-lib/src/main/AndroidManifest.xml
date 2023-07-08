@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.limbo.emu.lib"
     android:installLocation="auto"
     >
 
@@ -19,7 +18,7 @@
     <uses-feature android:glEsVersion="0x00020000" />
 
     <application
-        android:name="com.max2idea.android.limbo.main.LimboApplication"
+        android:name="com.max2idea.android.limbo.dontknowhy.LimboApplication"
         android:allowBackup="true"
         android:hardwareAccelerated="true"
         android:icon="@drawable/limbo"
@@ -28,17 +27,17 @@
         android:theme="@style/Theme.AppCompat">
 
         <activity
-            android:name="com.max2idea.android.limbo.main.LimboFileManager"
+            android:name="com.max2idea.android.limbo.dontknowhy.LimboFileManager"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize"
             android:label="File Manager" />
         <activity
-            android:name="com.max2idea.android.limbo.main.LimboSDLActivity"
+            android:name="com.max2idea.android.limbo.dontknowhy.LimboSDLActivity"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize"
             android:label="@string/app_name"
             android:launchMode="singleTask"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
-            android:name="com.max2idea.android.limbo.main.LimboSettingsManager"
+            android:name="com.max2idea.android.limbo.dontknowhy.LimboSettingsManager"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize"
             android:label="Settings" />
         <service

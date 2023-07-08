@@ -37,7 +37,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 
 import com.limbo.emu.lib.R;
-import com.max2idea.android.limbo.main.Config;
+import com.max2idea.android.limbo.dontknowhy.Config;
 
 import java.util.ArrayList;
 import java.util.Map;

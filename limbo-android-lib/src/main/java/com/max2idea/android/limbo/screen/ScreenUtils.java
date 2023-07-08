@@ -23,7 +23,7 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Point;
 import android.view.Display;
 
-import com.max2idea.android.limbo.main.LimboSettingsManager;
+import com.max2idea.android.limbo.dontknowhy.LimboSettingsManager;
 
 /** Utility Class for Screen Orientation changes
  */

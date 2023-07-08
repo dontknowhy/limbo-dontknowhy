@@ -32,10 +32,10 @@ import com.limbo.emu.lib.R;
 import com.max2idea.android.limbo.files.FileUtils;
 import com.max2idea.android.limbo.install.Installer;
 import com.max2idea.android.limbo.machine.Machine.FileType;
-import com.max2idea.android.limbo.main.Config;
-import com.max2idea.android.limbo.main.LimboActivity;
-import com.max2idea.android.limbo.main.LimboApplication;
-import com.max2idea.android.limbo.main.LimboFileManager;
+import com.max2idea.android.limbo.dontknowhy.Config;
+import com.max2idea.android.limbo.dontknowhy.LimboActivity;
+import com.max2idea.android.limbo.dontknowhy.LimboApplication;
+import com.max2idea.android.limbo.dontknowhy.LimboFileManager;
 import com.max2idea.android.limbo.toast.ToastUtils;
 
 import java.io.BufferedReader;
