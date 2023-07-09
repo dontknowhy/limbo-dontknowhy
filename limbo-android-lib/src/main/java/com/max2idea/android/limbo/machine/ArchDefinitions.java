@@ -126,8 +126,8 @@ public class ArchDefinitions {
 
     public static ArrayList<String> getMachineValues(Context context) {
         ArrayList<String> machinesList = new ArrayList<>();
-        machinesList.add("None");
-        machinesList.add("New");
+        machinesList.add("无");
+        machinesList.add("新建");
         return machinesList;
     }
 
@@ -136,7 +136,6 @@ public class ArchDefinitions {
         switch (LimboApplication.arch) {
             case x86:
             case x86_64:
-                arrList.add("Default");
                 arrList.addAll(Arrays.asList(Installer.getAttrs(context, R.raw.x86_cpu)));
                 break;
             case arm:

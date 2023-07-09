@@ -18,7 +18,6 @@ Copyright (C) Max Kastanas 2012
  */
 package com.max2idea.android.limbo.dontknowhy;
 
-import com.max2idea.android.limbo.links.LinksManager;
 
 import java.util.LinkedHashMap;
 
@@ -160,7 +159,7 @@ public class Config {
     public static final int defaultVNCPort = 1;
 
     //Keyboard Layout
-    public static String defaultKeyboardLayout = "en-us";
+    public static String defaultKeyboardLayout = "zh-cn";
 
     //a little nicer ui
     public static boolean collapseSections = true;
@@ -170,7 +169,6 @@ public class Config {
     //override this at the app level it dependes on the host arch
     public static boolean enableMTTCG = true;
 
-    public static LinkedHashMap<String, LinksManager.LinkInfo> osImages = new LinkedHashMap<>();
     public static boolean processMouseHistoricalEvents = false;
 
     //Change to true in prod if you want to be notified by default for new versions

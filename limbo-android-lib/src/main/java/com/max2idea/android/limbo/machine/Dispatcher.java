@@ -174,22 +174,22 @@ public class Dispatcher implements ViewListener {
             case NICCONFIG:
                 getMachine().setNetworkCard(convertString(property, value));
                 break;
-            case DISABLE_HPET:
+            case FAKE_BATTERY:
                 getMachine().setDisableHPET(convertBoolean(property, value) ? 1 : 0);
                 break;
-            case DISABLE_TSC:
+            case ENABLE_L3_CACHE:
                 getMachine().setDisableTSC(convertBoolean(property, value) ? 1 : 0);
                 break;
             case VGA:
                 getMachine().setVga(convertString(property, value));
                 break;
-            case DISABLE_ACPI:
+            case ENABLE_32_UEFI:
                 getMachine().setDisableACPI((convertBoolean(property, value) ? 1 : 0));
                 break;
             case DISABLE_FD_BOOT_CHK:
                 getMachine().setDisableFdBootChk((convertBoolean(property, value) ? 1 : 0));
                 break;
-            case ENABLE_KVM:
+            case ENABLE_64_UEFI:
                 getMachine().setEnableKVM((convertBoolean(property, value) ? 1 : 0));
                 break;
             case ENABLE_MTTCG:
@@ -259,9 +259,9 @@ public class Dispatcher implements ViewListener {
         Object[] params = (Object[]) value;
         MachineProperty machineDriveName = (MachineProperty) params[0];
         String diskFileValue = (String) params[1];
-        if (diskFileValue.equals("None") && isDriveEnabled(machineDriveName)) {
+        if (diskFileValue.equals("无") && isDriveEnabled(machineDriveName)) {
             setDriveValue(machineDriveName, "");
-        } else if (diskFileValue.equals("None") || !isDriveEnabled(machineDriveName)) {
+        } else if (diskFileValue.equals("无") || !isDriveEnabled(machineDriveName)) {
             setDriveValue(machineDriveName, null);
         } else if (isDriveEnabled(machineDriveName)) {
             setDriveValue(machineDriveName, diskFileValue);

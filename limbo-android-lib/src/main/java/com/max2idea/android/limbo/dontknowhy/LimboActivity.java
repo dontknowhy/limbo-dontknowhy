@@ -65,7 +65,6 @@ import com.max2idea.android.limbo.files.FileUtils;
 import com.max2idea.android.limbo.help.Help;
 import com.max2idea.android.limbo.install.Installer;
 import com.max2idea.android.limbo.keyboard.KeyboardUtils;
-import com.max2idea.android.limbo.links.LinksManager;
 import com.max2idea.android.limbo.log.Logger;
 import com.max2idea.android.limbo.machine.ArchDefinitions;
 import com.max2idea.android.limbo.machine.BIOSImporter;
@@ -527,10 +526,10 @@ public class LimboActivity extends AppCompatActivity
                 if (getMachine() == null)
                     return;
                 if (isChecked) {
-                    notifyFieldChange(MachineProperty.DISABLE_ACPI, true);
+                    notifyFieldChange(MachineProperty.ENABLE_32_UEFI, true);
                     mEnableKVM.setChecked(false);
                 } else {
-                    notifyFieldChange(MachineProperty.DISABLE_ACPI, isChecked);
+                    notifyFieldChange(MachineProperty.ENABLE_32_UEFI, isChecked);
                 }
             }
         });
@@ -539,7 +538,7 @@ public class LimboActivity extends AppCompatActivity
             public void onCheckedChanged(CompoundButton viewButton, boolean isChecked) {
                 if (getMachine() == null)
                     return;
-                notifyFieldChange(MachineProperty.DISABLE_HPET, isChecked);
+                notifyFieldChange(MachineProperty.FAKE_BATTERY, isChecked);
             }
         });
 
@@ -547,7 +546,7 @@ public class LimboActivity extends AppCompatActivity
             public void onCheckedChanged(CompoundButton viewButton, boolean isChecked) {
                 if (getMachine() == null)
                     return;
-                notifyFieldChange(MachineProperty.DISABLE_TSC, isChecked);
+                notifyFieldChange(MachineProperty.ENABLE_L3_CACHE, isChecked);
             }
         });
 
@@ -616,7 +615,7 @@ public class LimboActivity extends AppCompatActivity
                     promptKVM();
                     promptACPI();
                 } else {
-                    notifyFieldChange(MachineProperty.ENABLE_KVM, isChecked);
+                    notifyFieldChange(MachineProperty.ENABLE_64_UEFI, isChecked);
                 }
 
             }
@@ -682,7 +681,7 @@ public class LimboActivity extends AppCompatActivity
     private void promptACPI() {
         DialogInterface.OnClickListener okListener = new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
-                notifyFieldChange(MachineProperty.DISABLE_ACPI, true);
+                notifyFieldChange(MachineProperty.ENABLE_32_UEFI, true);
                 mEnableKVM.setChecked(false);
             }
         };
@@ -690,7 +689,7 @@ public class LimboActivity extends AppCompatActivity
     private void promptKVM() {
         DialogInterface.OnClickListener okListener = new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
-                notifyFieldChange(MachineProperty.ENABLE_KVM, true);
+                notifyFieldChange(MachineProperty.ENABLE_64_UEFI, true);
                 mDisableACPI.setChecked(false);
             }
         };
@@ -699,7 +698,7 @@ public class LimboActivity extends AppCompatActivity
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
                         mEnableKVM.setChecked(false);
-                        notifyFieldChange(MachineProperty.ENABLE_KVM, false);
+                        notifyFieldChange(MachineProperty.ENABLE_64_UEFI, false);
                     }
                 };
 
@@ -707,7 +706,7 @@ public class LimboActivity extends AppCompatActivity
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
                         mEnableKVM.setChecked(false);
-                        notifyFieldChange(MachineProperty.ENABLE_KVM, false);
+                        notifyFieldChange(MachineProperty.ENABLE_64_UEFI, false);
                         LimboActivityCommon.goToURL(LimboActivity.this, Config.kvmLink);
                     }
                 };
@@ -965,7 +964,6 @@ public class LimboActivity extends AppCompatActivity
         checkAndLoadLibs();
         restore();
         setupListeners();
-        addGenericOperatingSystems();
     }
 
     private void setupAppEnvironment() {
@@ -1290,20 +1288,12 @@ public class LimboActivity extends AppCompatActivity
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                showOperatingSystems();
                 populateMachines(getMachine().getName());
                 enableNonRemovableDeviceOptions(true);
                 enableRemovableDeviceOptions(true);
                 setArchOptions();
             }
         });
-    }
-
-    protected void showOperatingSystems() {
-        if (!Config.osImages.isEmpty()) {
-            LinksManager manager = new LinksManager(this);
-            manager.show();
-        }
     }
 
     private void onDeleteMachine() {
@@ -1871,20 +1861,20 @@ public class LimboActivity extends AppCompatActivity
         if (clear || getMachine() == null || mMachine.getSelectedItemPosition() < 2)
             mCPUSectionSummary.setText("");
         else {
-            String text = "Machine Type: " + getMachine().getMachineType()
+            String text = "芯片组类型: " + getMachine().getMachineType()
                     + ", CPU: " + getMachine().getCpu()
-                    + ", " + getMachine().getCpuNum() + " CPU" + ((getMachine().getCpuNum() > 1) ? "s" : "")
+                    + ", " + getMachine().getCpuNum() + " CPU" + ((getMachine().getCpuNum() > 1) ? "" : "")
                     + ", " + getMachine().getMemory() + " MB";
             if (mEnableMTTCG.isChecked())
-                text = appendOption("Enable MTTCG", text);
+                text = appendOption("启用MTTCG", text);
             if (mEnableKVM.isChecked())
-                text = appendOption("Enable UEFI(64)", text);
+                text = appendOption("启用UEFI(64)", text);
             if (mDisableACPI.isChecked())
-                text = appendOption("Enable UEFI(32)", text);
+                text = appendOption("启用UEFI(32)", text);
             if (mDisableHPET.isChecked())
-                text = appendOption("Fake Battery", text);
+                text = appendOption("伪装电池", text);
             if (mDisableTSC.isChecked())
-                text = appendOption("Enable l3 cache", text);
+                text = appendOption("启用l3缓存", text);
             mCPUSectionSummary.setText(text);
         }
     }
@@ -1894,17 +1884,17 @@ public class LimboActivity extends AppCompatActivity
             mStorageSectionSummary.setText("");
         else {
             String text = null;
-            text = appendDriveFilename(getMachine().getHdaImagePath(), text, "HDA", false);
-            text = appendDriveFilename(getMachine().getHdbImagePath(), text, "HDB", false);
-            text = appendDriveFilename(getMachine().getHdcImagePath(), text, "HDC", false);
-            text = appendDriveFilename(getMachine().getHddImagePath(), text, "HDD", false);
+            text = appendDriveFilename(getMachine().getHdaImagePath(), text, "磁盘A", false);
+            text = appendDriveFilename(getMachine().getHdbImagePath(), text, "磁盘B", false);
+            text = appendDriveFilename(getMachine().getHdcImagePath(), text, "磁盘C", false);
+            text = appendDriveFilename(getMachine().getHddImagePath(), text, "磁盘D", false);
 
             if (Config.enableSharedFolder)
                 text = appendDriveFilename(getMachine().getSharedFolderPath(), text,
                         getString(R.string.SharedFolder), false);
 
             if (text == null || text.equals("'"))
-                text = "None";
+                text = "无";
             mStorageSectionSummary.setText(text);
         }
     }
@@ -1916,13 +1906,13 @@ public class LimboActivity extends AppCompatActivity
             String text = null;
 
             text = appendDriveFilename(getMachine().getCdImagePath(), text, "CDROM", true);
-            text = appendDriveFilename(getMachine().getFdaImagePath(), text, "FDA", true);
-            text = appendDriveFilename(getMachine().getFdbImagePath(), text, "FDB", true);
+            text = appendDriveFilename(getMachine().getFdaImagePath(), text, "软盘A", true);
+            text = appendDriveFilename(getMachine().getFdbImagePath(), text, "软盘B", true);
             text = appendDriveFilename(getMachine().getSdImagePath(), text, "SD", true);
 
 
             if (text == null || text.equals(""))
-                text = "None";
+                text = "无";
 
             mRemovableStorageSectionSummary.setText(text);
         }
@@ -1932,7 +1922,7 @@ public class LimboActivity extends AppCompatActivity
         if (clear || getMachine() == null || mMachine.getSelectedItemPosition() < 2)
             mBootSectionSummary.setText("");
         else {
-            String text = "Boot from: " + getMachine().getBootDevice();
+            String text = "由此设备启动: " + getMachine().getBootDevice();
             text = appendDriveFilename(getMachine().getKernel(), text, "kernel", false);
             text = appendDriveFilename(getMachine().getInitRd(), text, "initrd", false);
             text = appendDriveFilename(getMachine().getAppend(), text, "append", false);
@@ -1944,9 +1934,9 @@ public class LimboActivity extends AppCompatActivity
 
         String file = null;
         if (driveFile != null) {
-            if ((driveFile.equals("") || driveFile.equals("None")) && allowEmptyDrive) {
-                file = drive + ": Empty";
-            } else if (!driveFile.equals("") && !driveFile.equals("None"))
+            if ((driveFile.equals("") || driveFile.equals("无")) && allowEmptyDrive) {
+                file = drive + ": 空";
+            } else if (!driveFile.equals("") && !driveFile.equals("无"))
                 file = drive + ": " + FileUtils.getFilenameFromPath(driveFile);
         }
         if (text == null && file != null)
@@ -1960,7 +1950,7 @@ public class LimboActivity extends AppCompatActivity
         if (clear || getMachine() == null || mMachine.getSelectedItemPosition() < 2)
             mGraphicsSectionSummary.setText("");
         else {
-            String text = "Video Card: " + getMachine().getVga();
+            String text = "显卡: " + getMachine().getVga();
             mGraphicsSectionSummary.setText(text);
         }
     }
@@ -1971,7 +1961,7 @@ public class LimboActivity extends AppCompatActivity
             mAudioSectionSummary.setText("");
         else {
             String soundCard = getMachine().getSoundCard();
-            String text = getString(R.string.AudioCard) + ": " + (soundCard != null ? soundCard : "None");
+            String text = getString(R.string.AudioCard) + ": " + (soundCard != null ? soundCard : "无");
             mAudioSectionSummary.setText(text);
         }
     }
@@ -1982,10 +1972,10 @@ public class LimboActivity extends AppCompatActivity
             mNetworkSectionSummary.setText("");
         else {
             String netCfg = getMachine().getNetwork();
-            String text = getString(R.string.Network) + ": " + (netCfg != null ? netCfg : "None");
-            if (netCfg != null && !netCfg.equals("None")) {
+            String text = getString(R.string.Network) + ": " + (netCfg != null ? netCfg : "无");
+            if (netCfg != null && !netCfg.equals("无")) {
                 String nicCard = getMachine().getNetworkCard();
-                text += ", " + getString(R.string.NicCard) + ": " + (nicCard != null ? nicCard : "None");
+                text += ", " + getString(R.string.NicCard) + ": " + (nicCard != null ? nicCard : "无");
                 text += ", " + getString(R.string.DNSServer) + ": " + mDNS.getText();
                 String hostFWD = getMachine().getHostFwd();
                 if (hostFWD != null && !hostFWD.equals(""))
@@ -2469,7 +2459,7 @@ public class LimboActivity extends AppCompatActivity
 
     private void populateBootDevices() {
         ArrayList<String> bootDevicesList = new ArrayList<>();
-        bootDevicesList.add("Default");
+        bootDevicesList.add("默认");
         bootDevicesList.add("CDROM");
         bootDevicesList.add("Hard Disk");
         if (Config.enableEmulatedFloppy)
@@ -2484,7 +2474,7 @@ public class LimboActivity extends AppCompatActivity
     }
 
     private void populateNet() {
-        String[] arraySpinner = {"None", "User", "TAP"};
+        String[] arraySpinner = {"无", "User", "TAP"};
         ArrayAdapter<String> netAdapter = new ArrayAdapter<>(this, R.layout.custom_spinner_item, arraySpinner);
         netAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
         mNetConfig.setAdapter(netAdapter);
@@ -2519,7 +2509,7 @@ public class LimboActivity extends AppCompatActivity
 
     private void populateSoundcardConfig() {
         ArrayList<String> soundCards = new ArrayList<>();
-        soundCards.add("None");
+        soundCards.add("无");
         soundCards.addAll(ArchDefinitions.getSoundcards(this));
         ArrayAdapter<String> sndAdapter = new ArrayAdapter<>(this, R.layout.custom_spinner_item, soundCards);
         sndAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
@@ -2606,9 +2596,9 @@ public class LimboActivity extends AppCompatActivity
             public void run() {
                 ArrayList<String> oldHDs = MachineFilePaths.getRecentFilePaths(fileType);
                 final ArrayList<String> arraySpinner = new ArrayList<>();
-                arraySpinner.add("None");
+                arraySpinner.add("无");
                 if (createOption)
-                    arraySpinner.add("New");
+                    arraySpinner.add("新建");
                 arraySpinner.add(getString(R.string.open));
                 final int index = arraySpinner.size();
                 if (oldHDs != null) {
@@ -2652,7 +2642,6 @@ public class LimboActivity extends AppCompatActivity
         }
         menu.add(0, IMPORT_BIOS_FILE, 0, R.string.ImportBIOSFile).setIcon(R.drawable.importvms);
         menu.add(0, SETTINGS, 0, R.string.Settings).setIcon(R.drawable.settings);
-        menu.add(0, TOOLS, 0, R.string.advancedTools).setIcon(R.drawable.advanced);
         menu.add(0, VIEWLOG, 0, R.string.ViewLog).setIcon(android.R.drawable.ic_menu_view);
         menu.add(0, HELP, 0, R.string.help).setIcon(R.drawable.help);
         menu.add(0, CHANGELOG, 0, R.string.Changelog).setIcon(android.R.drawable.ic_menu_help);
@@ -2867,17 +2856,6 @@ public class LimboActivity extends AppCompatActivity
         mSD.getAdapter().getCount();
         mKernel.getAdapter().getCount();
         mInitrd.getAdapter().getCount();
-    }
-
-    private void addGenericOperatingSystems() {
-        Config.osImages.put(getString(R.string.other), new LinksManager.LinkInfo("Other",
-                getString(R.string.otherOperatingSystem),
-                Config.otherOSLink,
-                LinksManager.LinkType.OTHER));
-                Config.osImages.put(getString(R.string.custom), new LinksManager.LinkInfo("Custom",
-                getString(R.string.customOperatingSystem),
-                null,
-                LinksManager.LinkType.OTHER));
     }
 
     @Override

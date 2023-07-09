@@ -48,13 +48,13 @@ public class MachineOpenHelper extends SQLiteOpenHelper implements IMachineDatab
             + MachineProperty.MACHINE_NAME.name() + " TEXT , " + MachineProperty.SNAPSHOT_NAME.name() + " TEXT , " + MachineProperty.CPU.name() + " TEXT, " + MachineProperty.ARCH.name() + " TEXT, " + MachineProperty.MEMORY.name()
             + " TEXT, " + MachineProperty.FDA.name() + " TEXT, " + MachineProperty.FDB.name() + " TEXT, " + MachineProperty.CDROM.name() + " TEXT, " + MachineProperty.HDA.name() + " TEXT, " + MachineProperty.HDB.name() + " TEXT, "
             + MachineProperty.HDC.name() + " TEXT, " + MachineProperty.HDD.name() + " TEXT, " + MachineProperty.BOOT_CONFIG.name() + " TEXT, " + MachineProperty.NETCONFIG.name() + " TEXT, " + MachineProperty.NICCONFIG.name()
-            + " TEXT, " + MachineProperty.VGA.name() + " TEXT, " + MachineProperty.SOUNDCARD.name() + " TEXT, " + MachineProperty.HDCONFIG.name() + " TEXT, " + MachineProperty.DISABLE_ACPI.name()
-            + " INTEGER, " + MachineProperty.DISABLE_HPET.name() + " INTEGER, " + MachineProperty.ENABLE_USBMOUSE.name() + " INTEGER, " + MachineProperty.STATUS.name() + " TEXT, "
+            + " TEXT, " + MachineProperty.VGA.name() + " TEXT, " + MachineProperty.SOUNDCARD.name() + " TEXT, " + MachineProperty.HDCONFIG.name() + " TEXT, " + MachineProperty.ENABLE_32_UEFI.name()
+            + " INTEGER, " + MachineProperty.FAKE_BATTERY.name() + " INTEGER, " + MachineProperty.ENABLE_USBMOUSE.name() + " INTEGER, " + MachineProperty.STATUS.name() + " TEXT, "
             + MachineProperty.LAST_UPDATED.name() + " DATE, " + MachineProperty.KERNEL.name() + " INTEGER, " + MachineProperty.INITRD.name() + " TEXT, " + MachineProperty.APPEND.name() + " TEXT, " + MachineProperty.CPUNUM.name()
             + " INTEGER, " + MachineProperty.MACHINETYPE.name() + " TEXT, " + MachineProperty.DISABLE_FD_BOOT_CHK.name() + " INTEGER, " + MachineProperty.SD.name() + " TEXT, " + MachineProperty.PAUSED.name()
             + " INTEGER, " + MachineProperty.SHARED_FOLDER.name() + " TEXT, " + MachineProperty.SHARED_FOLDER_MODE.name() + " INTEGER, " + MachineProperty.EXTRA_PARAMS.name() + " TEXT, "
-            + MachineProperty.HOSTFWD.name() + " TEXT, " + MachineProperty.GUESTFWD.name() + " TEXT, " + MachineProperty.UI.name() + " TEXT, " + MachineProperty.DISABLE_TSC.name() + " INTEGER, "
-            + MachineProperty.MOUSE.name() + " TEXT, " + MachineProperty.KEYBOARD.name() + " TEXT, " + MachineProperty.ENABLE_MTTCG.name() + " INTEGER, " + MachineProperty.ENABLE_KVM.name() + " INTEGER , "
+            + MachineProperty.HOSTFWD.name() + " TEXT, " + MachineProperty.GUESTFWD.name() + " TEXT, " + MachineProperty.UI.name() + " TEXT, " + MachineProperty.ENABLE_L3_CACHE.name() + " INTEGER, "
+            + MachineProperty.MOUSE.name() + " TEXT, " + MachineProperty.KEYBOARD.name() + " TEXT, " + MachineProperty.ENABLE_MTTCG.name() + " INTEGER, " + MachineProperty.ENABLE_64_UEFI.name() + " INTEGER , "
             + MachineProperty.HDA_INTERFACE.name() + " TEXT, " + MachineProperty.HDB_INTERFACE.name() + " TEXT, " + MachineProperty.HDC_INTERFACE.name() + " TEXT, " + MachineProperty.HDD_INTERFACE.name() + " TEXT , "
             + MachineProperty.CDROM_INTERFACE.name() + " TEXT "
             + ");";
@@ -145,11 +145,11 @@ public class MachineOpenHelper extends SQLiteOpenHelper implements IMachineDatab
         }
 
         if (newVersion >= 15 && oldVersion <= 14) {
-            db.execSQL("ALTER TABLE " + MACHINE_TABLE_NAME + " ADD COLUMN " + MachineProperty.DISABLE_TSC + " INTEGER;");
+            db.execSQL("ALTER TABLE " + MACHINE_TABLE_NAME + " ADD COLUMN " + MachineProperty.ENABLE_L3_CACHE + " INTEGER;");
             db.execSQL("ALTER TABLE " + MACHINE_TABLE_NAME + " ADD COLUMN " + MachineProperty.MOUSE + " TEXT;");
             db.execSQL("ALTER TABLE " + MACHINE_TABLE_NAME + " ADD COLUMN " + MachineProperty.KEYBOARD + " TEXT;");
             db.execSQL("ALTER TABLE " + MACHINE_TABLE_NAME + " ADD COLUMN " + MachineProperty.ENABLE_MTTCG + " INTEGER;");
-            db.execSQL("ALTER TABLE " + MACHINE_TABLE_NAME + " ADD COLUMN " + MachineProperty.ENABLE_KVM + " INTEGER;");
+            db.execSQL("ALTER TABLE " + MACHINE_TABLE_NAME + " ADD COLUMN " + MachineProperty.ENABLE_64_UEFI + " INTEGER;");
         }
 
         if (newVersion >= 16 && oldVersion <= 15) {
@@ -189,9 +189,9 @@ public class MachineOpenHelper extends SQLiteOpenHelper implements IMachineDatab
         stateValues.put(MachineProperty.NETCONFIG.name(), machine.getNetwork());
         stateValues.put(MachineProperty.NICCONFIG.name(), machine.getNetworkCard());
         stateValues.put(MachineProperty.VGA.name(), machine.getVga());
-        stateValues.put(MachineProperty.DISABLE_ACPI.name(), machine.getDisableAcpi());
-        stateValues.put(MachineProperty.DISABLE_HPET.name(), machine.getDisableHPET());
-        stateValues.put(MachineProperty.DISABLE_TSC.name(), machine.getDisableTSC());
+        stateValues.put(MachineProperty.ENABLE_32_UEFI.name(), machine.getDisableAcpi());
+        stateValues.put(MachineProperty.FAKE_BATTERY.name(), machine.getDisableHPET());
+        stateValues.put(MachineProperty.ENABLE_L3_CACHE.name(), machine.getDisableTSC());
         stateValues.put(MachineProperty.DISABLE_FD_BOOT_CHK.name(), machine.getDisableFdBootChk());
         stateValues.put(MachineProperty.SOUNDCARD.name(), machine.getSoundCard());
         stateValues.put(MachineProperty.KERNEL.name(), machine.getKernel());
@@ -206,7 +206,7 @@ public class MachineOpenHelper extends SQLiteOpenHelper implements IMachineDatab
         stateValues.put(MachineProperty.MOUSE.name(), machine.getMouse());
         stateValues.put(MachineProperty.KEYBOARD.name(), machine.getKeyboard());
         stateValues.put(MachineProperty.ENABLE_MTTCG.name(), machine.getEnableMTTCG());
-        stateValues.put(MachineProperty.ENABLE_KVM.name(), machine.getEnableKVM());
+        stateValues.put(MachineProperty.ENABLE_64_UEFI.name(), machine.getEnableKVM());
 
         @SuppressLint("SimpleDateFormat")
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -259,13 +259,13 @@ public class MachineOpenHelper extends SQLiteOpenHelper implements IMachineDatab
                 + MachineProperty.MACHINE_NAME + " , " + MachineProperty.CPU + " , " + MachineProperty.MEMORY + " , " + MachineProperty.CDROM + " , " + MachineProperty.FDA
                 + " , " + MachineProperty.FDB + " , " + MachineProperty.HDA + " , " + MachineProperty.HDB + " , " + MachineProperty.HDC + " , " + MachineProperty.HDD + " , "
                 + MachineProperty.NETCONFIG + " , " + MachineProperty.NICCONFIG + " , " + MachineProperty.VGA + " , " + MachineProperty.SOUNDCARD + " , "
-                + MachineProperty.HDCONFIG + " , " + MachineProperty.DISABLE_ACPI + " , " + MachineProperty.DISABLE_HPET + " , "
+                + MachineProperty.HDCONFIG + " , " + MachineProperty.ENABLE_32_UEFI + " , " + MachineProperty.FAKE_BATTERY + " , "
                 + MachineProperty.ENABLE_USBMOUSE + " , " + MachineProperty.SNAPSHOT_NAME + " , " + MachineProperty.BOOT_CONFIG + " , " + MachineProperty.KERNEL
                 + " , " + MachineProperty.INITRD + " , " + MachineProperty.APPEND + " , " + MachineProperty.CPUNUM + " , " + MachineProperty.MACHINETYPE + " , "
                 + MachineProperty.DISABLE_FD_BOOT_CHK + " , " + MachineProperty.ARCH + " , " + MachineProperty.PAUSED + " , " + MachineProperty.SD + " , "
                 + MachineProperty.SHARED_FOLDER + " , " + MachineProperty.SHARED_FOLDER_MODE + " , " + MachineProperty.EXTRA_PARAMS + " , "
-                + MachineProperty.HOSTFWD + " , " + MachineProperty.GUESTFWD + " , " + MachineProperty.UI + ", " + MachineProperty.DISABLE_TSC + ", "
-                + MachineProperty.MOUSE + ", " + MachineProperty.KEYBOARD + ", " + MachineProperty.ENABLE_MTTCG + ", " + MachineProperty.ENABLE_KVM + ", "
+                + MachineProperty.HOSTFWD + " , " + MachineProperty.GUESTFWD + " , " + MachineProperty.UI + ", " + MachineProperty.ENABLE_L3_CACHE + ", "
+                + MachineProperty.MOUSE + ", " + MachineProperty.KEYBOARD + ", " + MachineProperty.ENABLE_MTTCG + ", " + MachineProperty.ENABLE_64_UEFI + ", "
                 + MachineProperty.HDA_INTERFACE + ", " + MachineProperty.HDB_INTERFACE + ", " + MachineProperty.HDC_INTERFACE + ", " + MachineProperty.HDD_INTERFACE + ", "
                 + MachineProperty.CDROM_INTERFACE + " "
                 + " from " + MACHINE_TABLE_NAME
@@ -376,13 +376,13 @@ public class MachineOpenHelper extends SQLiteOpenHelper implements IMachineDatab
                 + MachineProperty.MACHINE_NAME + " , " + MachineProperty.CPU + " , " + MachineProperty.MEMORY + " , " + MachineProperty.CDROM + " , " + MachineProperty.FDA
                 + " , " + MachineProperty.FDB + " , " + MachineProperty.HDA + " , " + MachineProperty.HDB + " , " + MachineProperty.HDC + " , " + MachineProperty.HDD + " , "
                 + MachineProperty.NETCONFIG + " , " + MachineProperty.NICCONFIG + " , " + MachineProperty.VGA + " , " + MachineProperty.SOUNDCARD + " , "
-                + MachineProperty.HDCONFIG + " , " + MachineProperty.DISABLE_ACPI + " , " + MachineProperty.DISABLE_HPET + " , "
+                + MachineProperty.HDCONFIG + " , " + MachineProperty.ENABLE_32_UEFI+ " , " + MachineProperty.FAKE_BATTERY + " , "
                 + MachineProperty.ENABLE_USBMOUSE + " , " + MachineProperty.SNAPSHOT_NAME + " , " + MachineProperty.BOOT_CONFIG + " , " + MachineProperty.KERNEL
                 + " , " + MachineProperty.INITRD + " , " + MachineProperty.APPEND + " , " + MachineProperty.CPUNUM + " , " + MachineProperty.MACHINETYPE + " , "
                 + MachineProperty.DISABLE_FD_BOOT_CHK + " , " + MachineProperty.ARCH + " , " + MachineProperty.PAUSED + " , " + MachineProperty.SD + " , "
                 + MachineProperty.SHARED_FOLDER + " , " + MachineProperty.SHARED_FOLDER_MODE + " , " + MachineProperty.EXTRA_PARAMS + " , "
-                + MachineProperty.HOSTFWD + " , " + MachineProperty.GUESTFWD + " , " + MachineProperty.UI + ", " + MachineProperty.DISABLE_TSC + ", "
-                + MachineProperty.MOUSE + ", " + MachineProperty.KEYBOARD + ", " + MachineProperty.ENABLE_MTTCG + ", " + MachineProperty.ENABLE_KVM +", "
+                + MachineProperty.HOSTFWD + " , " + MachineProperty.GUESTFWD + " , " + MachineProperty.UI + ", " + MachineProperty.ENABLE_L3_CACHE + ", "
+                + MachineProperty.MOUSE + ", " + MachineProperty.KEYBOARD + ", " + MachineProperty.ENABLE_MTTCG + ", " + MachineProperty.ENABLE_64_UEFI +", "
                 + MachineProperty.HDA_INTERFACE + ", " + MachineProperty.HDB_INTERFACE + ", " + MachineProperty.HDC_INTERFACE + ", " + MachineProperty.HDD_INTERFACE + " "
                 + MachineProperty.CDROM_INTERFACE +" "
                 // Table

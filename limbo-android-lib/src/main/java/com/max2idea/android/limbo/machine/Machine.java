@@ -32,14 +32,14 @@ public class Machine extends Observable {
 
     private String name;
     private String keyboard = Config.defaultKeyboardLayout;
-    private String mouse = "ps2";
+    private String mouse = "usb-mouse";
     private int enableVNC;
     private String arch;
     private String machineType;
-    private String cpu = "Default";
-    private int cpuNum = 1;
-    private int memory = 128;
-    private int enableMTTCG;
+    private String cpu = "Haswell";
+    private int cpuNum = 4;
+    private int memory = 2048;
+    private int enableMTTCG = 1;
     private int enableKVM;
     private int disableACPI = 0;
     private int disableHPET = 0;
@@ -68,7 +68,7 @@ public class Machine extends Observable {
     private String sdImagePath;
     private String cdInterface = "ide";
     // Default Settings
-    private String bootDevice = "Default";
+    private String bootDevice = "默认";
     private String kernel;
     private String initRd;
     private String append;
@@ -192,7 +192,7 @@ public class Machine extends Observable {
         if (this.enableKVM != enableKVM) {
             this.enableKVM = enableKVM;
             setChanged();
-            notifyChanged(MachineProperty.ENABLE_KVM, enableKVM);
+            notifyChanged(MachineProperty.ENABLE_64_UEFI, enableKVM);
         }
     }
 
@@ -204,7 +204,7 @@ public class Machine extends Observable {
         if (this.disableACPI != disableACPI) {
             this.disableACPI = disableACPI;
             setChanged();
-            notifyChanged(MachineProperty.DISABLE_ACPI, disableACPI);
+            notifyChanged(MachineProperty.ENABLE_32_UEFI, disableACPI);
         }
 
     }
@@ -230,7 +230,7 @@ public class Machine extends Observable {
         if (this.disableTSC != disableTSC) {
             this.disableTSC = disableTSC;
             setChanged();
-            notifyChanged(MachineProperty.DISABLE_TSC, disableTSC);
+            notifyChanged(MachineProperty.ENABLE_L3_CACHE, disableTSC);
         }
 
     }
@@ -620,9 +620,9 @@ public class Machine extends Observable {
     void setDefaults() {
         if (LimboApplication.arch == Config.Arch.x86 || LimboApplication.arch == Config.Arch.x86_64) {
             arch = "x86";
-            cpu = "n270";
+            cpu = "Haswell";
             machineType = "pc";
-            networkCard = "Default";
+            networkCard = "e1000e";
             disableTSC = 1;
         } else if (LimboApplication.arch == Config.Arch.arm || LimboApplication.arch == Config.Arch.arm64) {
             arch = "ARM";
@@ -689,7 +689,7 @@ public class Machine extends Observable {
         if (this.disableHPET != disableHPET) {
             this.disableHPET = disableHPET;
             setChanged();
-            notifyChanged(MachineProperty.DISABLE_HPET, disableHPET);
+            notifyChanged(MachineProperty.FAKE_BATTERY, disableHPET);
         }
 
     }

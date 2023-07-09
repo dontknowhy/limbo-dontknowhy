@@ -3,7 +3,7 @@
     <PreferenceCategory android:title="Audio">
 
         <CheckBoxPreference
-            android:defaultValue="false"
+            android:defaultValue="true"
             android:key="enableAaudio"
             android:summary="@string/EnableAaudioSummary"
             android:title="@string/EnableAaudio" />

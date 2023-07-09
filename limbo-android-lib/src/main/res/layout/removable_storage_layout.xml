@@ -30,7 +30,7 @@
             android:layout_gravity="center|center_vertical"
             android:gravity="center|center_vertical"
             android:padding="10dp"
-            android:text="Removable"
+            android:text="可移动设备"
             android:textSize="20sp"
             android:textStyle="bold" />
 
@@ -125,7 +125,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:text="Floppy A: "
+                android:text="软盘A: "
                 android:textSize="15sp" />
 
             <Spinner
@@ -165,7 +165,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:text="Floppy B: "
+                android:text="软盘B: "
                 android:textSize="15sp" />
 
             <Spinner
@@ -205,7 +205,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:text="SD Card: "
+                android:text="SD卡: "
                 android:textSize="15sp" />
 
             <Spinner
