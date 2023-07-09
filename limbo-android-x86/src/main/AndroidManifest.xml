@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:versionCode="60001"
-    android:versionName="6.0.1-x86">
+    android:versionCode="60036"
+    android:versionName="v6.0.1-gen2.4.4x4-M3-build6.0.1_13_rev1_23.7.8_x86">
 
     <application
         tools:replace="android:label"

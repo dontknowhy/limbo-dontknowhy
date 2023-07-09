@@ -381,7 +381,7 @@ private String getQemuLibrary() {
             paramsList.add("-smp");
             paramsList.add(getMachine().getCpuNum() + ",cores=" + getMachine().getCpuNum());
         }
-        if (getMachineType() != null && !getMachineType().equals("Default")) {
+        if (getMachineType() != null && !getMachineType().equals("默认")) {
             paramsList.add("-M");
             paramsList.add(getMachineType() + ",vmport=off,kernel-irqchip=off,dump-guest-core=off,mem-merge=off,hmat=off");
         }
@@ -485,7 +485,7 @@ private String getQemuLibrary() {
                 paramsList.add(netParams);
             } else if (network.equals("tap")) {
                 paramsList.add("tap,vlan=0,ifname=tap0,script=no");
-            } else if (network.equals("none")) {
+            } else if (network.equals("无")) {
                 paramsList.add("none");
             } else {
                 //Unknown interface
@@ -535,8 +535,8 @@ private String getQemuLibrary() {
     }
 
     private String getNetCfg() {
-        if (getMachine().getNetwork() == null || getMachine().getNetwork().equals("None")) {
-            return "none";
+        if (getMachine().getNetwork() == null || getMachine().getNetwork().equals("无")) {
+            return "None";
         } else if (getMachine().getNetwork().equals("User")) {
             return "user";
         } else if (getMachine().getNetwork().equals("TAP")) {
@@ -547,7 +547,7 @@ private String getQemuLibrary() {
 
     private void addGraphicsOptions(ArrayList<String> paramsList) {
         if (getMachine().getVga() != null) {
-            if (getMachine().getVga().equals("Default")) {
+            if (getMachine().getVga().equals("默认")) {
                 //do nothing
             } else if (getMachine().getVga().equals("virtio-gpu-pci")) {
                 paramsList.add("-device");
@@ -672,7 +672,7 @@ private String getQemuLibrary() {
     private String getBootDevice() {
         if (LimboApplication.arch == Config.Arch.arm || LimboApplication.arch == Config.Arch.arm64) {
             return null;
-        } else if (getMachine().getBootDevice().equals("Default")) {
+        } else if (getMachine().getBootDevice().equals("默认")) {
             return null;
         } else if (getMachine().getBootDevice().equals("CDROM")) {
             return "d";
@@ -694,7 +694,7 @@ private String getQemuLibrary() {
 
     public String getDriveFilePath(String driveFilePath) {
         String imgPath = driveFilePath;
-        if (imgPath == null || imgPath.equals("None"))
+        if (imgPath == null || imgPath.equals("无"))
             return null;
         imgPath = FileUtils.encodeDocumentFilePath(imgPath);
         return imgPath;

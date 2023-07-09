@@ -32,7 +32,7 @@
             android:layout_gravity="center|center_vertical"
             android:gravity="center|center_vertical"
             android:padding="10dp"
-            android:text="Boot"
+            android:text="启动设置"
             android:textSize="20sp"
             android:textStyle="bold" />
 
@@ -77,7 +77,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:text="Boot from Device: "
+                android:text="由此设备启动: "
                 android:textSize="15sp" />
 
             <Spinner

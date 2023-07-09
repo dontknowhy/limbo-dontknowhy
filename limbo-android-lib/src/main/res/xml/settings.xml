@@ -18,7 +18,7 @@
             android:title="@string/orientation" />
 
         <CheckBoxPreference
-            android:defaultValue="false"
+            android:defaultValue="true"
             android:key="AlwaysShowMenuToolbar"
             android:summary="@string/AlwaysShowToolbar"
             android:title="@string/AlwaysToolbar" />
@@ -62,7 +62,7 @@
     </PreferenceCategory>
     <PreferenceCategory android:title="Advanced">
         <CheckBoxPreference
-            android:defaultValue="false"
+            android:defaultValue="true"
             android:key="HighPrio"
             android:summary="@string/RunVMThreadHighPriority"
             android:title="@string/HighPriority" />

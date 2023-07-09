@@ -116,7 +116,7 @@
     <string name="use_keymapper">Use Key Mapper</string>
     <string name="add_special_keys">Add Special Keys/Buttons</string>
     <string name="remove_key_mapper">Remove Key Mapper</string>
-    <string name="welcomeText">Welcome to Limbo Emulator, a port of QEMU for Android devices. Limbo can emulate several operating systems. For links to downloads, guides, and virtual disk images visit the Limbo Wiki. Download software and images only from trusted websites!"</string>
+    <string name="welcomeText">Welcome to Limbo Emulator, a port of QEMU for Android devices. Limbo can emulate several operating systems.\nFor links to downloads, guides, and virtual disk images visit the Limbo Wiki.\nDownload software and images only from trusted websites!</string>
     <string name="checkForUpdates">Check for Updates on Startup</string>
     <string name="sdcardNotMounted">Error: SD card is not mounted</string>
     <string name="fixesMouseParen">(Fixes Mouse)</string>
@@ -300,7 +300,7 @@
     <string name="CouldNotSetVNCPass">Could not set VNC Password</string>
     <string name="MachinesExported">Machines exported</string>
     <string name="LimboLog">Limbo Log</string>
-    <string name="CHANGELOG">CHANGELOG</string>
+    <string name="CHANGELOG" translatable="false">CHANGELOG</string>
     <string name="WriteAccess">Write Access</string>
     <string name="FilePathNotSupportedWarning">File path is not supported. Make sure you choose a file/directory from your internal storage or external sd card. Root and Download Directories are not supported.</string>
     <string name="KVMHelp">UEFI HELP</string>
@@ -372,4 +372,13 @@
     <string name="ImportBIOSFile">Import BIOS</string>
     <string name="importBIOSInstructions">Select a BIOS file (bin, rom, etc..) to import.</string>
     <string name="EnableKVM">Enable UEFI(64)</string>
+    <string name="save_snapshot">Save Snapshot</string>
+    <string name="board">Board</string>
+    <string name="machine_type">Machine Type:</string>
+    <string name="cpu_model">CPU Model:</string>
+    <string name="cpu_cores">CPU Cores:</string>
+    <string name="ram_memory">RAM Memory(MB)</string>
+    <string name="DisableHPET">Fake Battery</string>
+    <string name="DisableTSC">Enable l3 cache</string>
+    <string name="DisableACPI">Enable UEFI(32)</string>
 </resources>
