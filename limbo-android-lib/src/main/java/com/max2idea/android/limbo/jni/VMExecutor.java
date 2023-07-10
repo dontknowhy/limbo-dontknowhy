@@ -233,7 +233,7 @@ private String getQemuLibrary() {
 
         if (getMachine().getMouse() != null && !getMachine().getMouse().equals("ps2")) {
             paramsList.add("-device");
-            paramsList.add("usb-ehci,id=ehci,maxframes=256,x-pcie-extcap-init=true,x-pcie-lnksta-dlla=true,multifuntion=on");
+            paramsList.add("usb-ehci,id=ehci,maxframes=256,x-pcie-extcap-init=true,x-pcie-lnksta-dllla=true,multifunction=on");
             paramsList.add("-device");
             paramsList.add(getMachine().getMouse());
         }
