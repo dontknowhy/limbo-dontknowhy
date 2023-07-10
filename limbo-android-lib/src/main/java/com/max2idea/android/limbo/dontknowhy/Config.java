@@ -142,7 +142,7 @@ public class Config {
     public static boolean showToast = false;
     public static boolean closeFileDescriptors = true;
     //XXX: qemu vvfat is buggy so we disable
-    public static boolean enableSharedFolder = true;
+    public static boolean enableSharedFolder = false;
 
     public static String machineFolder = "machines/";
     public static String logFilePath = null;
@@ -184,6 +184,10 @@ public class Config {
     // override translation block size
     public static boolean overrideTbSize;
     public static String tbSize = "32M";
+
+    public static String VGAmem = "512";
+
+    public static String VirtIO_VGA_mem = "512M"  ;
 
     // Class that starts when user presses notification
     public static Class<?> clientClass = null;
