@@ -2434,10 +2434,14 @@ public class LimboActivity extends AppCompatActivity
         ArrayList<String>RAMValuesList = new ArrayList<>();
         RAMValuesList.add("16");
         RAMValuesList.add("32");
+        RAMValuesList.add("64");
         RAMValuesList.add("256");
         RAMValuesList.add("512");
         RAMValuesList.add("1024");
+        RAMValuesList.add("1526");
+        RAMValuesList.add("2560");
         RAMValuesList.add("2048");
+        RAMValuesList.add("3072");
         RAMValuesList.add("4096");
         String[] arraySpinner = RAMValuesList.toArray(new String[0]);
         ArrayAdapter<String> ramAdapter = new ArrayAdapter<>(this, R.layout.custom_spinner_item, arraySpinner);
@@ -2461,9 +2465,9 @@ public class LimboActivity extends AppCompatActivity
         ArrayList<String> bootDevicesList = new ArrayList<>();
         bootDevicesList.add("默认");
         bootDevicesList.add("CDROM");
-        bootDevicesList.add("Hard Disk");
+        bootDevicesList.add("硬盘");
         if (Config.enableEmulatedFloppy)
-            bootDevicesList.add("Floppy");
+            bootDevicesList.add("软盘");
 
         String[] arraySpinner = bootDevicesList.toArray(new String[0]);
 

@@ -232,7 +232,8 @@ private String getQemuLibrary() {
         }
 
         if (getMachine().getMouse() != null && !getMachine().getMouse().equals("ps2")) {
-            paramsList.add("-usb");
+            paramsList.add("-device");
+            paramsList.add("usb-ehci,id=ehci,maxframes=256,x-pcie-extcap-init=true,x-pcie-lnksta-dlla=true,multifuntion=on");
             paramsList.add("-device");
             paramsList.add(getMachine().getMouse());
         }
@@ -600,7 +601,7 @@ private String getQemuLibrary() {
                 paramsList.add("-global");
                 paramsList.add("VGA.edid=on");
                 paramsList.add("-global");
-                paramsList.add("VGA.vgamem_mb=512");
+                paramsList.add("VGA.vgamem_mb=" + Config.VGAmem);
                 paramsList.add("-global");
                 paramsList.add("VGA.global-vmstate=true");
                 paramsList.add("-global");
@@ -622,7 +623,7 @@ private String getQemuLibrary() {
                 paramsList.add("-global");
                 paramsList.add("virtio-vga.edid=on");
                 paramsList.add("-global");
-                paramsList.add("virtio-vga.max_hostmem=512M");
+                paramsList.add("virtio-vga.max_hostmem=" + Config.VirtIO_VGA_mem);
                 paramsList.add("-global");
                 paramsList.add("virtio-vga.max_outputs=1");
                 paramsList.add("-global");
