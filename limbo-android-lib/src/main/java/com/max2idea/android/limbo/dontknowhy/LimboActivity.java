@@ -1214,7 +1214,7 @@ public class LimboActivity extends AppCompatActivity
             ab.setDisplayHomeAsUpEnabled(true);
             ab.setDisplayShowCustomEnabled(true);
             ab.setDisplayShowTitleEnabled(true);
-            ab.setTitle(R.string.app_name);
+            ab.setTitle("Limbo xPro");
         }
     }
 

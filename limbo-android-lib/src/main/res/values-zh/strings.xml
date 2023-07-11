@@ -100,7 +100,7 @@
     <string name="add_special_keys">添加特殊按键</string>
     <string name="remove_key_mapper">清除键盘映射</string>
     <string name="welcomeText">欢迎来到Limbo模拟器，一个QEMU的安卓端口。她可以模拟一系列的操作系统。</string>
-    <string name="checkForUpdates">在启动时检查更新</string>
+    <string name="checkForUpdates">我想下载星穹轨道</string>
     <string name="sdcardNotMounted">错误：SD卡未被挂载</string>
     <string name="fixesMouseParen">（修复后的鼠标）</string>
     <string name="machinesImported">虚拟机已经被导入</string>
@@ -281,7 +281,7 @@
     <string name="OkIUnderstand">好的，我知道了</string>
     <string name="SendText">发送文本</string>
     <string name="Send">发送</string>
-    <string name="GoToWiki">在线wiki</string>
+    <string name="GoToWiki">下载原神</string>
     <string name="DoNotShowAgain">不要再展示</string>
     <string name="GenNewVersion">获取最新版本</string>
     <string name="Cancel">取消</string>
