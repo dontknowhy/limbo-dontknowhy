@@ -11,7 +11,9 @@
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize" />
+        android:layout_height="?attr/actionBarSize"
+        android:background="#323030"
+        android:fadingEdge="vertical" />
 
     <RelativeLayout
         android:id="@+id/top_layout"

@@ -6,12 +6,12 @@
 
     <application
         tools:replace="android:label"
-        android:label="Limbo x86 PC Emulator"
+        android:label="Limbo xPro"
         >
         <activity
             android:name="LimboEmuActivity"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize"
-            android:label="Limbo x86"
+            android:label="Limbo xPro"
             android:launchMode="singleTop"
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="true">

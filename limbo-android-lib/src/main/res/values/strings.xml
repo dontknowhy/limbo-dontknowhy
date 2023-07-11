@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">Limbo Emulator</string>
-    <string name="app_short_name">Limbo</string>
+    <string name="app_name">Limbo xPro</string>
+    <string name="app_short_name">Limbo xPro</string>
     <string name="address_caption">Address</string>
     <string name="alt_check">Alt</string>
     <string name="arrow_down">Down Arrow</string>
@@ -117,7 +117,7 @@
     <string name="add_special_keys">Add Special Keys/Buttons</string>
     <string name="remove_key_mapper">Remove Key Mapper</string>
     <string name="welcomeText">Welcome to Limbo Emulator, a port of QEMU for Android devices. Limbo can emulate several operating systems.\nFor links to downloads, guides, and virtual disk images visit the Limbo Wiki.\nDownload software and images only from trusted websites!</string>
-    <string name="checkForUpdates">Check for Updates on Startup</string>
+    <string name="checkForUpdates">I want to download Honkai: Star Rail</string>
     <string name="sdcardNotMounted">Error: SD card is not mounted</string>
     <string name="fixesMouseParen">(Fixes Mouse)</string>
     <string name="machinesImported">Machines Imported</string>
@@ -308,7 +308,7 @@
     <string name="OkIUnderstand">OK, I understand</string>
     <string name="SendText">Send Text</string>
     <string name="Send">Send</string>
-    <string name="GoToWiki">Online Wiki</string>
+    <string name="GoToWiki">Download Genshin Impact</string>
     <string name="DoNotShowAgain">Do not Show Again</string>
     <string name="GenNewVersion">Get New Version</string>
     <string name="Cancel">Cancel</string>

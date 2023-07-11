@@ -63,8 +63,8 @@
 
             <ImageView
                 android:id="@+id/hdaoptions"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="center_vertical"
                 android:paddingRight="5dp"
                 android:src="@drawable/harddisk" />
@@ -96,8 +96,8 @@
 
             <ImageView
                 android:id="@+id/hdboptions"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="center_vertical"
                 android:paddingRight="5dp"
                 android:src="@drawable/harddisk" />
@@ -130,8 +130,8 @@
 
             <ImageView
                 android:id="@+id/hdcoptions"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="center_vertical"
                 android:paddingRight="5dp"
                 android:src="@drawable/harddisk" />
@@ -164,8 +164,8 @@
 
             <ImageView
                 android:id="@+id/hddoptions"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="center_vertical"
                 android:paddingRight="5dp"
                 android:src="@drawable/harddisk" />
@@ -196,8 +196,8 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="center_vertical"
                 android:paddingRight="5dp"
                 android:src="@drawable/folder" />

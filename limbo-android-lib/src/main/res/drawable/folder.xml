@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="67.73"
+    android:viewportHeight="67.73">
+  <path
+      android:pathData="m9.987,2.443c0,0 -5.699,0 -5.699,5.699l-0.005,18.237l0.005,0l-0.005,35.348 53.577,-0.013c5.699,0 5.699,-5.699 5.699,-5.699l0,-29.635 0,-6.839 0,-6.839c0,0 0,-5.699 -5.699,-5.699l-28.496,0l-4.559,-4.559z"
+      android:strokeAlpha="0.2"
+      android:fillColor="#000"
+      android:fillAlpha="0.2"/>
+  <path
+      android:pathData="m24.805,2.158h-14.818c0,0 -5.699,0 -5.699,5.699v18.237h59.271v-13.678c0,0 0,-5.699 -5.699,-5.699h-28.496z"
+      android:fillColor="#a89888"/>
+  <group>
+    <clip-path
+        android:pathData="M24.805,2.158L9.987,2.158c0,0 -5.699,0 -5.699,5.699L4.288,26.094l59.271,0l0,-13.678c0,0 0,-5.699 -5.699,-5.699L29.364,6.717Z"/>
+    <path
+        android:pathData="m33.923,14.126 l-4.559,4.559l-19.377,0c0,0 -5.699,0 -5.699,5.699l0,37.614l53.572,0c5.699,0 5.699,-5.699 5.699,-5.699l0,-36.474c0,-5.699 -5.699,-5.699 -5.699,-5.699z"
+        android:strokeAlpha="0.1"
+        android:fillColor="#000"
+        android:fillAlpha="0.1"/>
+  </group>
+  <path
+      android:pathData="m33.923,13.556 l-4.559,4.559h-19.377c0,0 -5.699,0 -5.699,5.699v37.614h53.572c5.699,0 5.699,-5.699 5.699,-5.699v-36.474c0,-5.699 -5.699,-5.699 -5.699,-5.699z"
+      android:fillColor="#c9b8a7"/>
+  <path
+      android:pathData="m63.559,54.875c0,0 0,5.699 -5.699,5.699l-53.571,0.013 -0.001,0.855 53.572,-0.013c5.699,0 5.699,-5.699 5.699,-5.699z"
+      android:strokeAlpha="0.2"
+      android:fillColor="#000"
+      android:fillAlpha="0.2"/>
+  <path
+      android:pathData="m33.923,13.556 l-4.559,4.559h-19.377c0,0 -5.699,0 -5.699,5.699v0.57c0,-5.699 5.699,-5.699 5.699,-5.699h19.604l4.559,-4.559h23.71c0,0 5.699,0 5.699,5.699v-0.57c0,-5.699 -5.699,-5.699 -5.699,-5.699z"
+      android:strokeAlpha="0.3"
+      android:fillColor="#ffffff"
+      android:fillAlpha="0.3"/>
+</vector>

@@ -65,6 +65,7 @@ import com.max2idea.android.limbo.machine.MachineController;
 import com.max2idea.android.limbo.machine.MachineProperty;
 import com.max2idea.android.limbo.screen.ScreenUtils;
 import com.max2idea.android.limbo.toast.ToastUtils;
+import com.max2idea.android.limbo.network.NetworkUtils;
 
 import org.libsdl.app.SDLActivity;
 import org.libsdl.app.SDLAudioManager;
@@ -239,7 +240,7 @@ public class LimboSDLActivity extends SDLActivity
         } else if (item.getItemId() == R.id.itemCtrlAltDel) {
             sendCtrlAltDel();
         } else if (item.getItemId() == R.id.itemHelp) {
-            Help.showHelp(this);
+            downloadys();
         } else if (item.getItemId() == R.id.itemHideToolbar) {
             hideToolbar();
         } else if (item.getItemId() == R.id.itemDisplay) {
@@ -256,6 +257,9 @@ public class LimboSDLActivity extends SDLActivity
         return true;
     }
 
+    private void downloadys() {
+        NetworkUtils.openURL(mSingleton, Config.guidesLink);
+    }
     private void promptSendText() {
         final AlertDialog alertDialog;
         alertDialog = new AlertDialog.Builder(this).create();

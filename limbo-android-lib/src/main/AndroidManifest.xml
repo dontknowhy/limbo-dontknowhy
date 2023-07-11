@@ -29,7 +29,7 @@
         <activity
             android:name="com.max2idea.android.limbo.dontknowhy.LimboFileManager"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize"
-            android:label="File Manager" />
+            android:label="文件管理器" />
         <activity
             android:name="com.max2idea.android.limbo.dontknowhy.LimboSDLActivity"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize"
@@ -39,7 +39,7 @@
         <activity
             android:name="com.max2idea.android.limbo.dontknowhy.LimboSettingsManager"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize"
-            android:label="Settings" />
+            android:label="设置" />
         <service
             android:name="com.max2idea.android.limbo.machine.MachineService"
             android:enabled="true"

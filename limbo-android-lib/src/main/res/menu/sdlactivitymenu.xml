@@ -73,7 +73,7 @@
     <item
         android:id="@+id/itemHelp"
         android:icon="@drawable/help"
-        android:title="@string/help" />
+        android:title="@string/GoToWiki" />
 
     <!--XXXX: Not needed-->
     <item

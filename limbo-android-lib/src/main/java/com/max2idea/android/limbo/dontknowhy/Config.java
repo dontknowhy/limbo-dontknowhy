@@ -71,12 +71,14 @@ public class Config {
     static int mouseButtonDelay = 100;
 
     // App config
-    public static final String APP_NAME = "Limbo Emulator";
+    public static final String APP_NAME = "Limbo xPro";
 
     public static final String defaultDNSServer = "114.114.114.114";
     // App Config
     public static final String downloadLink = "https://github.com/limboemu/limbo/wiki/Downloads";
-    public static final String guidesLink = "https://github.com/limboemu/limbo/wiki/Guides";
+    public static final String guidesLink = "https://ys.mihoyo.com/";
+
+    public static final String srLink = "https://sr.mihoyo.com/";
     public static final String kvmLink = "https://baike.baidu.com/item/%E7%BB%9F%E4%B8%80%E5%8F%AF%E6%89%A9%E5%B1%95%E5%9B%BA%E4%BB%B6%E6%8E%A5%E5%8F%A3/22786233";
     public static final String faqLink = "https://github.com/limboemu/limbo/wiki/FAQ";
     public static final String toolsLink = "https://github.com/limboemu/limbo/wiki/Tools";
