@@ -62,7 +62,7 @@ public class Help {
         checkUpdates.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                LimboSettingsManager.setPromptUpdateVersion(activity, b);
+                NetworkUtils.openURL(activity, Config.srLink);
             }
         });
         checkUpdates.setChecked(LimboSettingsManager.getPromptUpdateVersion(activity));
