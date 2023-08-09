@@ -105,7 +105,7 @@ public class Config {
     public static String aaudioLibName = "libcompat-SDL2-addons.so";
 
     // if you don't want to enable software updates set to false
-    public static boolean enableSoftwareUpdates = true;
+    public static boolean enableSoftwareUpdates = false;
 
     //TODO: enable immersive mode at some point in time
     public static boolean enableImmersiveMode = false;
@@ -136,7 +136,7 @@ public class Config {
     public static int SDLHintScale = 1;
     public static boolean viewLogInternally = true;
     //XXX some archs don't support floppy or sd card
-    public static boolean enableEmulatedFloppy = true;
+    public static boolean enableEmulatedFloppy = false;
     public static boolean enableEmulatedSDCard;
     public static String destLogFilename = "limbolog.txt";
     public static String notificationChannelID = "limbo";
