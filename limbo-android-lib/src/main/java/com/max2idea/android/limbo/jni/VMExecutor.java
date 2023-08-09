@@ -263,6 +263,8 @@ private String getQemuLibrary() {
     }
 
     private void addGenericOptions(Context context, ArrayList<String> paramsList) {
+        paramsList.add("-name");
+        paramsList.add(MachineController.getInstance().getMachine().getName());
         paramsList.add("-L");
         paramsList.add(LimboApplication.getBasefileDir());
         if (LimboSettingsManager.getEnableQmp(context)) {
@@ -304,70 +306,13 @@ private String getQemuLibrary() {
             paramsList.add("mem-lock=off");
         }
 
-        paramsList.add("-rtc");
-        paramsList.add("base=localtime");
-        paramsList.add("-boot");
-        paramsList.add("menu=on,strict=off");
         paramsList.add("-no-fd-bootchk");
-        paramsList.add("-msg");
-        paramsList.add("timestamp=off");
         paramsList.add("-no-hpet");
         paramsList.add("-nodefaults");
-        paramsList.add("-rtc");
-        paramsList.add("base=localtime,clock=host");
+        paramsList.add("-readconfig");
+        paramsList.add("limbo.cfg");
         paramsList.add("-audiodev");
         paramsList.add("sdl,id=sdl,in.channels=2,in.frequency=44100,out.buffer-length=12000,in.format=s16,in.voices=2");
-        paramsList.add("-name");
-        paramsList.add("Limbo x86");
-        paramsList.add("-global");
-        paramsList.add("ide-hd.physical_block_size=1024");
-        paramsList.add("-global");
-        paramsList.add("ide-cd.physical_block_size=1024");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.physical_block_size=1024");
-        paramsList.add("-global");
-        paramsList.add("ide-hd.logical_block_size=512");
-        paramsList.add("-global");
-        paramsList.add("ide-cd.logical_block_size=512");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.logical_block_size=512");
-        paramsList.add("-global");
-        paramsList.add("ide-hd.write-cache=on");
-        paramsList.add("-global");
-        paramsList.add("ide-cd.write-cache=on");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.write-cache=on");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.ats=on");
-        paramsList.add("-global");
-        paramsList.add("ide-hd.share-rw=false");
-        paramsList.add("-global");
-        paramsList.add("ide-cd.share-rw=false");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.queue-size=1024");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.use-disabled-flag=true");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.use-started=true");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.seg-max-adjust=true");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.write-zeroes=true");
-        paramsList.add("-global");
-        paramsList.add("virtio-blk-pci.scsi=off");
-        paramsList.add("-global");
-        paramsList.add("ich9-ahci.x-pcie-extcap-init=true");
-        paramsList.add("-global");
-        paramsList.add("ich9-ahci.x-pcie-lnksta-dllla=true");
-        paramsList.add("-global");
-        paramsList.add("ide-hd.model=Seagate ST3320620A");
-        paramsList.add("-global");
-        paramsList.add("ide-hd.serial=ST3320620A");
-        paramsList.add("-global");
-        paramsList.add("ide-cd.model=SONY CRX230A");
-        paramsList.add("-global");
-        paramsList.add("ide-cd.serial=CRX230A");
-
         if (!Config.enableDefaultDevices)
             paramsList.add("-nodefaults");
     }
@@ -432,7 +377,7 @@ private String getQemuLibrary() {
         if (getMachine().getEnableKVM() != 0) {
             paramsList.add("-pflash");
             paramsList.add("edk2-x86_64-code.fd");
-        } else {
+        }
             paramsList.add("-accel");
             String tcgParams = "tcg";
             if (getMachine().getEnableMTTCG() != 0) {
@@ -441,7 +386,6 @@ private String getQemuLibrary() {
                 tcgParams += ",thread=single";
             }
             paramsList.add(tcgParams);
-        }
     }
 
     private String getMachineType() {
@@ -553,95 +497,11 @@ private String getQemuLibrary() {
             } else if (getMachine().getVga().equals("virtio-gpu-pci")) {
                 paramsList.add("-device");
                 paramsList.add(getMachine().getVga());
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.xres=1280");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.yres=800");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.vectors=3");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.indirect_desc=on");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.edid=on");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.max_hostmem=512M");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.max_outputs=1");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.virtio-pci-bus-master-bug-migration=off");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.event_idx=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.notify_on_empty=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.any_layout=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.iommu_platform=false");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.packed=false");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.use-started=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-gpu-pci.use-disabled-flag=true");
             } else if (getMachine().getVga().equals("nographic")) {
                 paramsList.add("-nographic");
             } else {
                 paramsList.add("-vga");
                 paramsList.add(getMachine().getVga());
-                paramsList.add("-global");
-                paramsList.add("VGA.xmax=1920");
-                paramsList.add("-global");
-                paramsList.add("VGA.xres=2400");
-                paramsList.add("-global");
-                paramsList.add("VGA.ymax=1920");
-                paramsList.add("-global");
-                paramsList.add("VGA.yres=2400");
-                paramsList.add("-global");
-                paramsList.add("VGA.romfile=vgabios.bin");
-                paramsList.add("-global");
-                paramsList.add("VGA.edid=on");
-                paramsList.add("-global");
-                paramsList.add("VGA.vgamem_mb=" + Config.VGAmem);
-                paramsList.add("-global");
-                paramsList.add("VGA.global-vmstate=true");
-                paramsList.add("-global");
-                paramsList.add("VGA.qemu-extended-regs=off");
-                paramsList.add("-global");
-                paramsList.add("VGA.rombar=1");
-                paramsList.add("-global");
-                paramsList.add("VGA.mmio=off");
-                paramsList.add("-global");
-                paramsList.add("VGA.multifunction=off");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.xres=1280");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.yres=800");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.vectors=3");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.indirect_desc=on");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.edid=on");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.max_hostmem=" + Config.VirtIO_VGA_mem);
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.max_outputs=1");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.virtio-pci-bus-master-bug-migration=off");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.event_idx=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.notify_on_empty=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.any_layout=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.iommu_platform=false");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.packed=false");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.use-started=true");
-                paramsList.add("-global");
-                paramsList.add("virtio-vga.use-disabled-flag=true");
             }
         }
     }

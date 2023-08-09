@@ -12,7 +12,7 @@
         android:title="@string/center_mouse" />
     <item
         android:id="@+id/itemDrives"
-        android:icon="@drawable/drives"
+        android:icon="@drawable/cdrom"
         android:title="@string/drives"></item>
 
     <item

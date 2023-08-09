@@ -124,6 +124,7 @@ public class MachineService extends Service {
         }
 
         Log.d(TAG, "Starting VM: " + MachineController.getInstance().getMachine().getName());
+        Log.d(TAG, "Hello from dontknowhy!");
         setupLocks();
 
         // notify we started
