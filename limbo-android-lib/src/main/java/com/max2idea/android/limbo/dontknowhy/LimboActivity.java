@@ -2042,8 +2042,8 @@ public class LimboActivity extends AppCompatActivity
 
     private void postLoadMachineUI() {
 
-        mFDAenable.setChecked(getMachine().getFdaImagePath() != null);
-        mFDBenable.setChecked(getMachine().getFdbImagePath() != null);
+        /*mFDAenable.setChecked(getMachine().getFdaImagePath() != null);
+        mFDBenable.setChecked(getMachine().getFdbImagePath() != null);*/
         mCDenable.setChecked(getMachine().getCdImagePath() != null);
         mSDenable.setChecked(getMachine().getSdImagePath() != null);
 
