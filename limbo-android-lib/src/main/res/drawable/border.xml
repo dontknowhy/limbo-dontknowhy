@@ -3,5 +3,12 @@
     android:shape="rectangle">
     <stroke
         android:width="2dp"
-        android:color="#808080" />
+        android:color="#67FFFFFF" />
+    <corners
+        android:topLeftRadius="2dp"
+        android:topRightRadius="2dp"
+        android:bottomLeftRadius="2dp"
+        android:bottomRightRadius="2dp"
+        android:radius="2dp" />
+    <EditText android:layout_marginBottom="1dp" />
 </shape>

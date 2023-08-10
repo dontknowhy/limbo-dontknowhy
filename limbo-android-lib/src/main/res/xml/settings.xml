@@ -1,7 +1,7 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
 
     <PreferenceCategory android:title="Files">
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="false"
             android:key="EnableLegacyFileManager"
             android:summary="@string/EnableLegacyFileManagerSummary"
@@ -17,13 +17,13 @@
             android:summary="@string/orientation"
             android:title="@string/orientation" />
 
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="true"
             android:key="AlwaysShowMenuToolbar"
             android:summary="@string/AlwaysShowToolbar"
             android:title="@string/AlwaysToolbar" />
 
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="true"
             android:key="ShowFullscreen"
             android:summary="Show Fullscreen"
@@ -37,7 +37,7 @@
             android:summary="@string/KeyMapperButtonLayout"
             android:title="@string/KeyMapperLayout" />
 
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="false"
             android:key="preventMouseOutOfBounds"
             android:summary="@string/PreventMouseDescr"
@@ -61,7 +61,7 @@
 
     </PreferenceCategory>
     <PreferenceCategory android:title="Advanced">
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="true"
             android:key="HighPrio"
             android:summary="@string/RunVMThreadHighPriority"
@@ -69,13 +69,13 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="QMP">
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="true"
             android:key="enableQMP"
             android:summary="@string/EnableQMPServerSummary"
             android:title="@string/EnableQMPServer" />
 
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="false"
             android:dependency="enableQMP"
             android:key="enableExternalQMP"
@@ -85,7 +85,7 @@
     </PreferenceCategory>
     <PreferenceCategory android:title="VNC">
 
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="false"
             android:dependency="enableQMP"
             android:key="enableVNCPassword"
@@ -98,7 +98,7 @@
             android:summary="@string/SetVNCPassword"
             android:title="@string/SetVNCPassword" />
 
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="false"
             android:dependency="enableQMP"
             android:key="enableExternalVNC"
@@ -118,10 +118,17 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Fixes">
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="false"
             android:key="ignoreBreakpointInvalidation"
             android:summary="@string/IgnoreBreakpointInvalidationSummary"
             android:title="@string/IgnoreBreakpointInvalidation" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Background">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="BackgroundSetting"
+            android:title="@string/BackgroundString"
+            android:summary="@string/BackgroundSummary"/>
     </PreferenceCategory>
 </PreferenceScreen>

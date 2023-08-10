@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/bootSectionl"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:layout_gravity="center|center_vertical"
@@ -26,7 +25,6 @@
 
 
         <TextView
-            android:id="@+id/bootsectionStr"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center|center_vertical"
@@ -60,7 +58,6 @@
         android:padding="10dp">
 
         <LinearLayout
-            android:id="@+id/bootfroml"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -73,7 +70,6 @@
                 android:src="@drawable/drives" />
 
             <TextView
-                android:id="@+id/bootfromstr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -86,13 +82,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/kernell"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -106,7 +102,6 @@
                 android:src="@drawable/sysfile" />
 
             <TextView
-                android:id="@+id/kernelStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -119,13 +114,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/initrdl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -139,7 +134,6 @@
                 android:src="@drawable/sysfile" />
 
             <TextView
-                android:id="@+id/initrdStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -152,13 +146,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/appendl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -166,7 +160,6 @@
             android:padding="10dp">
 
             <TextView
-                android:id="@+id/appendStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -175,12 +168,14 @@
 
             <EditText
                 android:id="@+id/appendval"
+                style="@android:style/Widget.AutoCompleteTextView"
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content"
+                android:backgroundTint="#00FFFFFF"
                 android:gravity="right"
                 android:hint="ie: root=/dev/sda1"
                 android:inputType="textFilter|textNoSuggestions"
-                android:singleLine="true"
+                android:singleLine="false"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>

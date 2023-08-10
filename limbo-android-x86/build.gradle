@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 31
 
     defaultConfig {
         applicationId "com.limbo.emu.dontknowhy"
@@ -36,7 +36,7 @@ dependencies {
 //    implementation fileTree(include: ['*.jar,*.so'], dir: 'libs')
     implementation fileTree(dir: 'libs', include: ['.jar','.so'])
 
-    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.appcompat:appcompat:1.3.0'
 
     implementation project(':limbo-android-lib')
 }

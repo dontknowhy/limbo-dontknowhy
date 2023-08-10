@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/controls_layout"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_gravity="center"
@@ -14,7 +13,6 @@
     tools:showIn="@layout/limbo_main">
 
     <LinearLayout
-        android:id="@+id/controlm"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
@@ -32,7 +30,8 @@
             android:layout_centerHorizontal="true"
             android:layout_weight="1"
             android:focusable="true"
-            android:src="@drawable/play" />
+            android:src="@drawable/play"
+            android:tint="#CCFFFFFF" />
 
         <ImageButton
             android:id="@+id/pausevm"
@@ -42,7 +41,8 @@
             android:layout_centerHorizontal="true"
             android:layout_weight="1"
             android:focusable="true"
-            android:src="@drawable/pause" />
+            android:src="@drawable/pause"
+            android:tint="#CCFFFFFF" />
 
         <ImageButton
             android:id="@+id/stopvm"
@@ -50,7 +50,8 @@
             android:layout_height="50dp"
             android:layout_weight="1"
             android:focusable="true"
-            android:src="@drawable/stop" />
+            android:src="@drawable/stop"
+            android:tint="#CCFFFFFF" />
 
         <ImageButton
             android:id="@+id/restartvm"
@@ -59,6 +60,7 @@
             android:layout_weight="1"
 
             android:focusable="true"
-            android:src="@drawable/reset" />
+            android:src="@drawable/reset"
+            android:tint="#CCFFFFFF" />
     </LinearLayout>
 </RelativeLayout>

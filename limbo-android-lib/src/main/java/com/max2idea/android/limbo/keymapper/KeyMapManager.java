@@ -18,6 +18,8 @@ Copyright (C) Max Kastanas 2012
  */
 package com.max2idea.android.limbo.keymapper;
 
+import static android.view.KeyEvent.KEYCODE_CTRL_LEFT;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -37,6 +39,7 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.SimpleAdapter;
+import android.widget.Toast;
 
 import com.limbo.emu.lib.R;
 import com.max2idea.android.limbo.keyboard.KeyboardUtils;
@@ -364,15 +367,20 @@ public class KeyMapManager {
     }
 
     private void promptAdvancedKey() {
+        /*给予用户一点提示防止他们不会输入组合按键*/
+        ToastUtils.toastLong(activity, activity.getString(R.string.keymaper_tip));
 
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(activity);
         alertDialogBuilder.setTitle(R.string.SpecialKeysButtons);
-        final CharSequence[] items = new CharSequence[]{"Left Ctrl", "Right Ctrl", "Left Alt", "Right Alt",
-                "Left Shift", "Right Shift", "Fn", "Mouse Btn Left", "Mouse Btn Middle", "Mouse Btn Right"};
-        final int[] itemsKeyCodes = new int[]{KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT,
+        final CharSequence[] items = new CharSequence[]{"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "Left Ctrl", "Right Ctrl", "Left Alt", "Right Alt",
+                "Left Shift", "Right Shift", "Fn", "Mouse Btn Left", "Mouse Btn Middle", "Mouse Btn Right", "Windows/Meta Key", "Esc", "Dpad Up", "Dpad Down", "Dpad Left", "Dpad Right"};
+        final int[] itemsKeyCodes = new int[]{KeyEvent.KEYCODE_F1, KeyEvent.KEYCODE_F2, KeyEvent.KEYCODE_F3, KeyEvent.KEYCODE_F4, KeyEvent.KEYCODE_F5,
+                KeyEvent.KEYCODE_F6, KeyEvent.KEYCODE_F7, KeyEvent.KEYCODE_F8, KeyEvent.KEYCODE_F9, KeyEvent.KEYCODE_F10, KeyEvent.KEYCODE_F11,
+                KeyEvent.KEYCODE_F12, KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT,
                 KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT, KeyEvent.KEYCODE_SHIFT_LEFT,
                 KeyEvent.KEYCODE_SHIFT_RIGHT, KeyEvent.KEYCODE_FUNCTION, Config.SDL_MOUSE_LEFT,
-                Config.SDL_MOUSE_MIDDLE, Config.SDL_MOUSE_RIGHT
+                Config.SDL_MOUSE_MIDDLE, Config.SDL_MOUSE_RIGHT, KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_ESCAPE,
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT,  KeyEvent.KEYCODE_DPAD_RIGHT
         };
         final boolean[] itemsEnabled = new boolean[items.length];
         alertDialogBuilder.setMultiChoiceItems(items, itemsEnabled, new DialogInterface.OnMultiChoiceClickListener() {

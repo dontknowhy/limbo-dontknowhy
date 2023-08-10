@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/storagesectionl"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/border"
@@ -23,7 +22,6 @@
             android:src="@drawable/harddisk" />
 
         <TextView
-            android:id="@+id/storagesectionStr"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center|center_vertical"
@@ -56,7 +54,6 @@
         android:padding="10dp">
 
         <LinearLayout
-            android:id="@+id/hdaimgl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -70,7 +67,6 @@
                 android:src="@drawable/harddisk" />
 
             <TextView
-                android:id="@+id/hdaimgstr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -83,13 +79,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/hdbimgl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -103,7 +99,6 @@
                 android:src="@drawable/harddisk" />
 
             <TextView
-                android:id="@+id/hdbimgstr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -116,13 +111,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/hdcimgl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -137,7 +132,6 @@
                 android:src="@drawable/harddisk" />
 
             <TextView
-                android:id="@+id/hdcimgstr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -150,13 +144,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/hddimgl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -171,7 +165,6 @@
                 android:src="@drawable/harddisk" />
 
             <TextView
-                android:id="@+id/hddimgstr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -184,6 +177,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
@@ -203,7 +197,6 @@
                 android:src="@drawable/folder" />
 
             <TextView
-                android:id="@+id/sharedfolderstr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -216,6 +209,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />

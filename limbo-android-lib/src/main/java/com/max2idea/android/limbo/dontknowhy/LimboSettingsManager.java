@@ -260,6 +260,11 @@ public class LimboSettingsManager extends PreferenceActivity {
         return prefs.getBoolean("enableAaudio", false);
     }
 
+    public static boolean getBackgroundLinus(Context activity) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
+        return prefs.getBoolean("BackgroundSetting", true);
+    }
+
     public static String getDiskCache(Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         return prefs.getString("diskCachePref", context.getString(R.string.Default));

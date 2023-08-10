@@ -1,22 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_alignParentTop="true"
     android:background="#000000"
     android:keepScreenOn="true"
+    android:theme="@style/Theme.AppCompat"
     android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#323030"
-        android:fadingEdge="vertical" />
+        android:background="#CC323030"
+        android:fadingEdge="vertical"
+        app:popupTheme="@style/leftEllipsisSimpleSpinnerItem" />
 
     <RelativeLayout
-        android:id="@+id/top_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -39,8 +41,9 @@
                     android:id="@+id/sdl"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_margin="4dp"
+                    android:layout_weight="1"
+                    android:background="#CCFFFFFF"
                     android:orientation="vertical" />
 
                 <View
