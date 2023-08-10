@@ -3,6 +3,8 @@
     android:id="@+id/main_layout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg"
+    android:backgroundTintMode="add"
     android:keepScreenOn="true"
     android:orientation="vertical">
 
@@ -10,11 +12,10 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:alpha="1"
-        android:background="?attr/colorPrimary" />
+        android:background="#80000000"
+        android:popupBackground="@color/popup_color" />
 
     <LinearLayout
-        android:id="@+id/scroll_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">

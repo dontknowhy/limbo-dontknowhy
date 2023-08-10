@@ -763,6 +763,8 @@ public class KeySurfaceView extends SurfaceView implements SurfaceHolder.Callbac
             text = "F11";
         else if (keycode == KeyEvent.KEYCODE_F12)
             text = "F12";
+        else if (keycode == KeyEvent.KEYCODE_META_LEFT)
+            text = "Meta";
         else
             return ((char) unicodeChar) + "";
         return text;

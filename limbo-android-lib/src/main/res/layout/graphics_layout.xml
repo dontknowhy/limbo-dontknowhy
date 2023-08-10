@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/graphicssectionl"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/border"
@@ -24,7 +23,6 @@
             android:src="@drawable/screen" />
 
         <TextView
-            android:id="@+id/graphicssectionStr"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center|center_vertical"
@@ -57,7 +55,6 @@
         android:padding="10dp">
 
         <LinearLayout
-            android:id="@+id/vgacfgl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -71,7 +68,6 @@
                 android:src="@drawable/screen" />
 
             <TextView
-                android:id="@+id/vgacfgStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -84,6 +80,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />

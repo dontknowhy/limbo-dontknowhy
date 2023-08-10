@@ -18,14 +18,18 @@
  */
 package com.max2idea.android.limbo.dontknowhy;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.NotificationManager;
+import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Point;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -56,6 +60,8 @@ import android.widget.TextView;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.widget.NestedScrollView;
 
 import com.limbo.emu.lib.R;
@@ -317,11 +323,11 @@ public class LimboActivity extends AppCompatActivity
 
                 }
         );
-        if(driveOptions!=null) {
+        if (driveOptions != null) {
             driveOptions.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    if(driveEnable.isChecked())
+                    if (driveEnable.isChecked())
                         promptDriveInterface(driveName);
                 }
             });
@@ -521,7 +527,7 @@ public class LimboActivity extends AppCompatActivity
             }
         });
 
-            mDisableACPI.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+        mDisableACPI.setOnCheckedChangeListener(new OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton viewButton, boolean isChecked) {
                 if (getMachine() == null)
                     return;
@@ -686,6 +692,7 @@ public class LimboActivity extends AppCompatActivity
             }
         };
     }
+
     private void promptKVM() {
         DialogInterface.OnClickListener okListener = new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
@@ -816,7 +823,7 @@ public class LimboActivity extends AppCompatActivity
     }
 
     private void promptDriveInterface(final MachineProperty machineDriveName) {
-        if(getMachine() == null)
+        if (getMachine() == null)
             return;
 
         final String[] items = {
@@ -829,7 +836,7 @@ public class LimboActivity extends AppCompatActivity
         mBuilder.setSingleChoiceItems(items, driveInterface, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int i) {
-                notifyFieldChange(MachineProperty.MEDIA_INTERFACE, new Object[] {machineDriveName, items[i]});
+                notifyFieldChange(MachineProperty.MEDIA_INTERFACE, new Object[]{machineDriveName, items[i]});
                 dialog.dismiss();
             }
         });
@@ -839,7 +846,7 @@ public class LimboActivity extends AppCompatActivity
 
     private int getMachineInterface(MachineProperty machineDriveName, String[] items) {
         String hdInterfaceStr = null;
-        switch(machineDriveName) {
+        switch (machineDriveName) {
             case HDA:
                 hdInterfaceStr = getMachine().getHdaInterface();
                 break;
@@ -856,8 +863,8 @@ public class LimboActivity extends AppCompatActivity
                 hdInterfaceStr = getMachine().getCDInterface();
                 break;
         }
-        for(int i=0; i<items.length; i++) {
-            if(items[i].equals(hdInterfaceStr))
+        for (int i = 0; i < items.length; i++) {
+            if (items[i].equals(hdInterfaceStr))
                 return i;
         }
         return 0;
@@ -968,6 +975,15 @@ public class LimboActivity extends AppCompatActivity
 
     private void setupAppEnvironment() {
         LimboApplication.setupEnv(this);
+        boolean isBackgroundLinusEnabled = LimboSettingsManager.getBackgroundLinus(this);
+        Log.d("Limbo", "Background Linus Enabled: " + isBackgroundLinusEnabled);
+        Log.d("TODO", "Setting Background doesn't work,Fix that Later.");
+        if (LimboSettingsManager.getBackgroundLinus(this)) {
+            setContentView(R.layout.limbo_main);
+            View setBackground = findViewById(R.id.main_layout);
+            Drawable drawable = ContextCompat.getDrawable(this, R.drawable.ys);
+            setBackground.setBackground(drawable);
+        }
     }
 
     private void setupController() {
@@ -2087,8 +2103,8 @@ public class LimboActivity extends AppCompatActivity
         seMachineDriveValue(FileType.CDROM, getMachine().getCdImagePath());
 
         // Floppy
-        seMachineDriveValue(FileType.FDA, getMachine().getFdaImagePath());
-        seMachineDriveValue(FileType.FDB, getMachine().getFdbImagePath());
+        /*seMachineDriveValue(FileType.FDA, getMachine().getFdaImagePath());
+        seMachineDriveValue(FileType.FDB, getMachine().getFdbImagePath());*/
 
         // SD Card
         seMachineDriveValue(FileType.SD, getMachine().getSdImagePath());

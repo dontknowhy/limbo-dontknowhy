@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/networksectionl"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/border"
@@ -24,7 +23,6 @@
             android:src="@drawable/network" />
 
         <TextView
-            android:id="@+id/networksectionStr"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center|center_vertical"
@@ -56,7 +54,6 @@
         android:padding="10dp">
 
         <LinearLayout
-            android:id="@+id/netcfgl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -70,7 +67,6 @@
                 android:src="@drawable/network" />
 
             <TextView
-                android:id="@+id/netcfgStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -83,13 +79,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/netDeviceslm"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
@@ -102,7 +98,6 @@
                 android:src="@drawable/networkcard" />
 
             <TextView
-                android:id="@+id/netDevicesStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -115,13 +110,13 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/dnsl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -135,7 +130,6 @@
                 android:src="@drawable/dnsserver" />
 
             <TextView
-                android:id="@+id/dnsStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -156,7 +150,6 @@
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/hostfwdl"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -164,7 +157,6 @@
             android:padding="10dp">
 
             <TextView
-                android:id="@+id/hostfwdStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"

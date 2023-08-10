@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/userInterfaceSectionl"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/border"
@@ -24,7 +23,6 @@
             android:src="@drawable/ui" />
 
         <TextView
-            android:id="@+id/userInterfaceSectionStr"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
@@ -58,7 +56,6 @@
         android:padding="10dp">
 
         <LinearLayout
-            android:id="@+id/uil"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -72,7 +69,6 @@
                 android:src="@drawable/ui" />
 
             <TextView
-                android:id="@+id/uiStr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
@@ -84,14 +80,15 @@
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
+                android:foregroundTint="#CCFFFFFF"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/keyboard"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -106,7 +103,6 @@
                 android:src="@drawable/keyboard" />
 
             <TextView
-                android:id="@+id/keyboardstr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="right|center_vertical"
@@ -120,6 +116,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />
@@ -127,7 +124,6 @@
 
 
         <LinearLayout
-            android:id="@+id/mouse"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -142,7 +138,6 @@
                 android:src="@drawable/mouse" />
 
             <TextView
-                android:id="@+id/mousestr"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="right|center_vertical"
@@ -156,6 +151,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:gravity="right"
+                android:popupBackground="@color/popup_color"
                 android:singleLine="true"
                 android:text=""
                 android:textSize="15sp" />

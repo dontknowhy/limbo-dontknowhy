@@ -1,4 +1,9 @@
-﻿* Limbo xPro Hybrid v6.0.1-gen2.4.4x4-M3-build6.0.1_13_rev1_23.7.8_x86
+﻿* Limbo xPro Hybrid v6.0.1-gen2.4.4x8-M1-build6.0.1_14_rev1_23.8.10_x86
+进一步美化界面
+为keymapper添加更多按键
+去除了不必要的软盘模拟
+
+* Limbo xPro Hybrid v6.0.1-gen2.4.4x4-M3-build6.0.1_13_rev1_23.7.8_x86
 用Android Studio重新编译
 更改了RAM，使其阳间
 更新了新建磁盘的选项，显卡选项，网卡型号选项

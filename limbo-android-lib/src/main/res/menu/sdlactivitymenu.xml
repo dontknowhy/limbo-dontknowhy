@@ -81,24 +81,12 @@
         android:icon="@android:drawable/ic_menu_zoom"
         android:title="@string/scaling">
         <menu>
-            <group
-                android:id="@+id/groupScaling"
-                android:checkableBehavior="single">
-                <item
-                    android:id="@+id/itemOneToOne"
-                    android:title="@string/one_to_one" />
-                <item
-                    android:id="@+id/itemZoomIn"
-                    android:title="@string/zoom_in" />
-                <item
-                    android:id="@+id/itemZoomOut"
-                    android:title="@string/zoom_out" />
-                <item
-                    android:id="@+id/itemFitToScreen"
-                    android:title="@string/fit_to_screen" />
-                <item
-                    android:id="@+id/itemStretchToScreen"
-                    android:title="@string/stretch_to_screen" />
+            <group android:checkableBehavior="single">
+                <item android:title="@string/one_to_one" />
+                <item android:title="@string/zoom_in" />
+                <item android:title="@string/zoom_out" />
+                <item android:title="@string/fit_to_screen" />
+                <item android:title="@string/stretch_to_screen" />
             </group>
         </menu>
     </item>
