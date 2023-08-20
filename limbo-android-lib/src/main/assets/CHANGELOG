@@ -1,4 +1,10 @@
-﻿* Limbo xPro Hybrid v6.0.1-gen2.4.4x8-M1-build6.0.1_14_rev1_23.8.10_x86
+﻿*Limbo xPro Hybrid v6.0.1-gen2.4.8x2-M1-build6.0.1_14_rev1_23.8.20_x86
+掌握了重新编译QEMU的技能，目前没有打算更新QEMU版本
+警告：目前只剩下对于arm64-v8a支持，其余的并没有考虑
+QEMU库现在只能在支持fp和NEON的处理器运行，所以如果崩溃了麻烦换一个Limbo
+新添加android-shmem库，据说可以提升性能
+
+* Limbo xPro Hybrid v6.0.1-gen2.4.4x8-M1-build6.0.1_14_rev1_23.8.10_x86
 进一步美化界面
 为keymapper添加更多按键
 去除了不必要的软盘模拟
