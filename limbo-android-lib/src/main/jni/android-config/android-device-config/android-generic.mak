@@ -55,7 +55,8 @@ ARCH_LD_CFLAGS += -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now -Wl,--warn-shared-t
 ifeq ($(USE_OPTIMIZATION),true)
         #ARCH_CFLAGS += -O2
         # Below optimizations might not be safe
-        ARCH_CFLAGS += -Ofast
+        ARCH_CFLAGS += -O3
+        #ARCH_CFLAGS += -flto=thin
         # might not be supported by clang
         #ARCH_CFLAGS += -fforce-addr
         #ARCH_CFLAGS += -ffast-math
