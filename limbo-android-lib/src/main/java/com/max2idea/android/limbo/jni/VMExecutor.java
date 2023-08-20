@@ -311,6 +311,8 @@ private String getQemuLibrary() {
         paramsList.add("-nodefaults");
         paramsList.add("-readconfig");
         paramsList.add("limbo.cfg");
+        paramsList.add("-global");
+        paramsList.add("VGA.romfile=vgabios-xbzj.bin"); /*防止VGA的BIOS出现问题*/
         paramsList.add("-audiodev");
         paramsList.add("sdl,id=sdl,in.channels=2,in.frequency=44100,out.buffer-length=12000,in.format=s16,in.voices=2");
         if (!Config.enableDefaultDevices)
@@ -357,6 +359,11 @@ private String getQemuLibrary() {
         if (getMachine().getDisableHPET() != 0) {
             paramsList.add("-acpitable");
             paramsList.add("file=battery.dat");
+        }
+
+        if (getMachine().getDisableAcpi() == 0 && getMachine().getEnableKVM() == 0) {
+            paramsList.add("-bios");
+            paramsList.add("bios-xbzj.bin");
         }
 
         if (cpu != null && !cpu.equals("Default")) {
