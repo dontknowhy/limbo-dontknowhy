@@ -258,5 +258,6 @@
     <string name="BackgroundSummary">使用老莱自拍照作为应用的背景（需要重启）（目前不工作）</string>
     <string name="audio_preference">Audio</string>
     <string name="keymaper_tip">你可以选择一个按键并点击最顶上工具栏的键盘图标来制作一个组合按键</string>
+    <string name="bios_installed_msg">BIOS和键盘映射文件已安装</string>
 
 </resources>
