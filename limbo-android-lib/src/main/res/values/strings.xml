@@ -266,4 +266,5 @@
     <string name="BackgroundSummary">Use the famous Linus selfie as the application\'s background</string>
     <string name="audio_preference">Audio</string>
     <string name="keymaper_tip">You can select a key and click the Keyboard icon to make a key combination</string>
+    <string name="bios_installed_msg">BIOS and Keymap files installed</string>
 </resources>
