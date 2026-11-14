@@ -134,6 +134,14 @@ shrank by 1.4%.  They are therefore **not** enabled.  To repeat the
 experiment: `EXTRA_CFLAGS="..." QEMU_BUILD=$BUILD/qemu-build-opt
 scripts/qemu-configure.sh`, then build/relink as usual.
 
+Polly *is* included in the NDK r30 clang and works for sequential
+optimisation; only `-polly-parallel` is off the table because it pulls in
+libomp, which this project does not ship.  A Polly build
+(`-mllvm -polly -polly-vectorizer=stripmine -polly-invariant-load-hoisting
+-polly-run-inliner -polly-run-dce -polly-detect-keep-going
+-polly-ast-use-context`) configures and links fine; benchmark it with
+`scripts/serial-bench.py` before adopting it.
+
 
 5. Source tarballs (`deps/`)
 --------------------------------------------------------------------------------
