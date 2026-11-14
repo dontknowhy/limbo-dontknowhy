@@ -22,6 +22,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.net.Uri;
+import android.content.pm.PackageInfo;
+import android.os.Build;
 import androidx.documentfile.provider.DocumentFile;
 import android.util.Log;
 
@@ -31,12 +33,15 @@ import com.max2idea.android.limbo.dontknowhy.LimboApplication;
 import com.max2idea.android.limbo.toast.ToastUtils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.zip.CRC32;
 
 /**
  *
@@ -75,6 +80,19 @@ public class FileInstaller {
 
         String destDir = LimboApplication.getBasefileDir();
 
+        // LIMBO: the assets are copied into the cache dir, which survives app
+        // updates, so a rebuilt APK used to keep serving the previous roms and
+        // firmware.  Remember which APK installed the current copy and do a
+        // full verification pass whenever it changes.
+        String assetsTag = assetsTag(activity);
+        String installedTag = readAssetsTag(tmpDir);
+        final boolean verifyAll = assetsTag != null && !assetsTag.equals(installedTag);
+        if (verifyAll) {
+            Log.w(TAG, "Roms were installed by another build (was " + installedTag
+                    + ", now " + assetsTag + "); verifying all installed assets");
+        }
+        boolean installOk = true;
+
         //Get each file in assets under ./roms/ and install in SDCARD
         AssetManager am = activity.getResources().getAssets();
         String[] files = null;
@@ -107,18 +125,174 @@ public class FileInstaller {
                 for (int k = 0; k < subfiles.length; k++) {
 
                     File file = new File(destDir, files[i] + "/" + subfiles[k]);
-                    if(!file.exists() || force) {
+                    if(!file.exists() || force
+                            || assetNeedsReinstall(am, files[i] + "/" + subfiles[k], file, verifyAll)) {
                         Log.d(TAG, "Installing file: " + file.getPath());
-                        installAssetFile(activity, files[i] + "/" + subfiles[k], destDir, "roms", null);
+                        installOk &= installAssetFile(activity, files[i] + "/" + subfiles[k], destDir, "roms", null);
                     }
                 }
             } else {
                 File file = new File(destDir, files[i]);
-                if(!file.exists() || force) {
+                if(!file.exists() || force || assetNeedsReinstall(am, files[i], file, verifyAll)) {
                     Log.d(TAG, "Installing file: " + file.getPath());
-                    installAssetFile(activity, files[i], LimboApplication.getBasefileDir(), "roms", null);
+                    installOk &= installAssetFile(activity, files[i], LimboApplication.getBasefileDir(), "roms", null);
                 }
             }
+        }
+
+        if (installOk && assetsTag != null) {
+            writeAssetsTag(tmpDir, assetsTag);
+        }
+    }
+
+    private static final String ASSETS_TAG_FILE = ".assets-tag";
+
+    private static String assetsTag(Activity activity) {
+        try {
+            PackageInfo pi = activity.getPackageManager()
+                    .getPackageInfo(activity.getPackageName(), 0);
+            long versionCode = (Build.VERSION.SDK_INT >= 28)
+                    ? pi.getLongVersionCode() : pi.versionCode;
+            return versionCode + "-" + pi.lastUpdateTime;
+        } catch (Exception e) {
+            Log.e(TAG, "Could not read package info: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static String readAssetsTag(File baseDir) {
+        File f = new File(baseDir, ASSETS_TAG_FILE);
+        if (!f.exists()) {
+            return null;
+        }
+        InputStream is = null;
+        try {
+            is = new FileInputStream(f);
+            byte[] buf = new byte[128];
+            int n = is.read(buf);
+            return n > 0 ? new String(buf, 0, n).trim() : "";
+        } catch (Exception e) {
+            Log.e(TAG, "Could not read " + ASSETS_TAG_FILE + ": " + e.getMessage());
+            return null;
+        } finally {
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private static void writeAssetsTag(File baseDir, String tag) {
+        OutputStream os = null;
+        try {
+            os = new FileOutputStream(new File(baseDir, ASSETS_TAG_FILE));
+            os.write(tag.getBytes());
+        } catch (Exception e) {
+            Log.e(TAG, "Could not write " + ASSETS_TAG_FILE + ": " + e.getMessage());
+        } finally {
+            if (os != null) {
+                try {
+                    os.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private static final String[] VERIFIED_ASSET_EXTENSIONS = {".fd", ".bin", ".rom"};
+
+    /**
+     * LIMBO: the roms under assets/roms are copied to the base dir only when the
+     * destination is missing, so an app update never refreshes them.  That let a
+     * stale 4MiB firmware image survive a download of a newer 3.5MiB one, and
+     * UEFI guests silently stopped booting (they hung in 16-bit real mode).
+     * Verify firmware assets against the APK copy and reinstall on mismatch.
+     * With allTypes (a different APK installed the current copy) every asset is
+     * compared, not just firmware, so a renamed/rebuilt data file is refreshed
+     * too.
+     */
+    private static boolean assetNeedsReinstall(AssetManager am, String assetPath, File dest,
+                                               boolean allTypes) {
+        String lower = assetPath.toLowerCase(Locale.US);
+        boolean verified = false;
+        for (String ext : VERIFIED_ASSET_EXTENSIONS) {
+            if (lower.endsWith(ext)) {
+                verified = true;
+                break;
+            }
+        }
+        // "xbzj" files are intentionally supplied/replaced by the user
+        if ((!verified && !allTypes) || lower.contains("xbzj")) {
+            return false;
+        }
+        try {
+            long[] asset = assetSizeAndCrc(am, "roms/" + assetPath);
+            if (asset == null) {
+                return false;
+            }
+            if (dest.length() != asset[0]) {
+                Log.w(TAG, "Asset stale: " + dest.getName() + " on disk "
+                        + dest.length() + " bytes, in apk " + asset[0] + " bytes; reinstalling");
+                return true;
+            }
+            // UEFI firmware is the pflash device: QEMU writes the NVRAM variable
+            // store into it at boot, so its bytes legitimately differ from the
+            // shipped image.  Size is still a reliable staleness check (the bug
+            // this guards against shipped a 4MiB image where 3.5MiB was expected).
+            if (lower.endsWith(".fd")) {
+                return allTypes;
+            }
+            if (fileCrc(dest) != asset[1]) {
+                Log.w(TAG, "Asset differs from apk: " + dest.getName()
+                        + " checksum differs from apk; reinstalling");
+                return true;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Could not verify " + dest.getName() + ": " + e.getMessage());
+        }
+        return false;
+    }
+
+    private static long[] assetSizeAndCrc(AssetManager am, String path) throws IOException {
+        InputStream is = null;
+        try {
+            is = am.open(path);
+            CRC32 crc = new CRC32();
+            byte[] buf = new byte[65536];
+            long total = 0;
+            int n;
+            while ((n = is.read(buf)) > 0) {
+                crc.update(buf, 0, n);
+                total += n;
+            }
+            return new long[]{total, crc.getValue()};
+        } catch (IOException e) {
+            Log.e(TAG, "Could not read asset " + path + ": " + e.getMessage());
+            return null;
+        } finally {
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private static long fileCrc(File f) throws IOException {
+        InputStream is = new FileInputStream(f);
+        try {
+            CRC32 crc = new CRC32();
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = is.read(buf)) > 0) {
+                crc.update(buf, 0, n);
+            }
+            return crc.getValue();
+        } finally {
+            is.close();
         }
     }
 

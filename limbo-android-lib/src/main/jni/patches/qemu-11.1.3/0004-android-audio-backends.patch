@@ -1,0 +1,1590 @@
+diff --git a/audio/aaudioaudio.c b/audio/aaudioaudio.c
+--- a/audio/aaudioaudio.c
++++ b/audio/aaudioaudio.c
+@@ -0,0 +1,598 @@
++/*
++ * QEMU AAudio audio driver (Android)
++ *
++ * Playback and capture backend using AAudio.  libaaudio.so only exists on
++ * API 26+, while this QEMU build targets API 21, so the library is loaded at
++ * runtime with dlopen()/dlsym() instead of adding a hard DT_NEEDED
++ * dependency.
++ *
++ * For playback the mixeng ring buffer is pulled from the AAudio callback
++ * thread directly into the buffer supplied by AAudio; for capture the filled
++ * buffer handed to the callback is copied into the mixeng ring.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include "qemu/osdep.h"
++#include <dlfcn.h>
++#include <aaudio/AAudio.h>
++
++#include "qemu/module.h"
++#include "qemu/error-report.h"
++#include "qemu/thread.h"
++#include "qapi/error.h"
++#include "qemu/audio.h"
++#include "qom/object.h"
++
++#include "audio_int.h"
++
++#define TYPE_AUDIO_AAUDIO "audio-aaudio"
++OBJECT_DECLARE_SIMPLE_TYPE(AudioAaudio, AUDIO_AAUDIO)
++
++static AudioBackendClass *audio_aaudio_parent_class;
++
++struct AudioAaudio {
++    AudioMixengBackend parent_obj;
++};
++
++typedef struct AaudioVoiceOut {
++    HWVoiceOut hw;
++    Audiodev *dev;
++    bool exit;
++    bool initialized;
++    bool playing;
++
++    AAudioStream *stream;
++    QemuMutex lock;
++    bool lock_initialized;
++
++    size_t period_bytes;
++    unsigned nbuf;
++} AaudioVoiceOut;
++
++typedef struct AaudioVoiceIn {
++    HWVoiceIn hw;
++    Audiodev *dev;
++    bool exit;
++    bool initialized;
++    bool recording;
++
++    AAudioStream *stream;
++    QemuMutex lock;
++    bool lock_initialized;
++} AaudioVoiceIn;
++
++#define AAUDIO_NBUF 4
++
++/* Runtime-resolved AAudio entry points. */
++typedef aaudio_result_t (*aaudio_create_builder_fn)(AAudioStreamBuilder **);
++typedef void (*aaudio_builder_delete_fn)(AAudioStreamBuilder *);
++typedef void (*aaudio_builder_direction_fn)(AAudioStreamBuilder *,
++                                            aaudio_direction_t);
++typedef void (*aaudio_builder_perf_fn)(AAudioStreamBuilder *,
++                                       aaudio_performance_mode_t);
++typedef void (*aaudio_builder_format_fn)(AAudioStreamBuilder *, aaudio_format_t);
++typedef void (*aaudio_builder_int_fn)(AAudioStreamBuilder *, int32_t);
++typedef void (*aaudio_builder_cb_fn)(AAudioStreamBuilder *,
++                                     AAudioStream_dataCallback, void *);
++typedef void (*aaudio_builder_err_fn)(AAudioStreamBuilder *,
++                                      AAudioStream_errorCallback, void *);
++typedef aaudio_result_t (*aaudio_builder_open_fn)(AAudioStreamBuilder *,
++                                                  AAudioStream **);
++typedef aaudio_result_t (*aaudio_stream_int_fn)(AAudioStream *, int32_t);
++typedef int32_t (*aaudio_stream_get_int_fn)(AAudioStream *);
++typedef aaudio_result_t (*aaudio_stream_void_fn)(AAudioStream *);
++typedef aaudio_result_t (*aaudio_stream_close_fn)(AAudioStream *);
++
++static struct {
++    void *lib;
++    bool tried;
++    aaudio_create_builder_fn create_builder;
++    aaudio_builder_delete_fn builder_delete;
++    aaudio_builder_direction_fn set_direction;
++    aaudio_builder_perf_fn set_performance_mode;
++    aaudio_builder_format_fn set_format;
++    aaudio_builder_int_fn set_channel_count;
++    aaudio_builder_int_fn set_sample_rate;
++    aaudio_builder_cb_fn set_data_callback;
++    aaudio_builder_err_fn set_error_callback;
++    aaudio_builder_int_fn set_buffer_capacity;
++    aaudio_builder_open_fn open_stream;
++    aaudio_stream_int_fn set_buffer_size;
++    aaudio_stream_get_int_fn get_sample_rate;
++    aaudio_stream_void_fn request_start;
++    aaudio_stream_void_fn request_stop;
++    aaudio_stream_close_fn close;
++} aa;
++
++static bool aaudio_load(void)
++{
++    if (aa.tried) {
++        return aa.lib != NULL;
++    }
++    aa.tried = true;
++
++    aa.lib = dlopen("libaaudio.so", RTLD_NOW | RTLD_LOCAL);
++    if (!aa.lib) {
++        return false;
++    }
++
++#define LOAD(field, name)                                              \
++    do {                                                               \
++        *(void **)(&aa.field) = dlsym(aa.lib, name);                   \
++        if (!aa.field) {                                               \
++            error_report("aaudio: missing symbol %s", name);           \
++            dlclose(aa.lib);                                           \
++            aa.lib = NULL;                                             \
++            return false;                                              \
++        }                                                              \
++    } while (0)
++
++    LOAD(create_builder, "AAudio_createStreamBuilder");
++    LOAD(builder_delete, "AAudioStreamBuilder_delete");
++    LOAD(set_direction, "AAudioStreamBuilder_setDirection");
++    LOAD(set_performance_mode, "AAudioStreamBuilder_setPerformanceMode");
++    LOAD(set_format, "AAudioStreamBuilder_setFormat");
++    LOAD(set_channel_count, "AAudioStreamBuilder_setChannelCount");
++    LOAD(set_sample_rate, "AAudioStreamBuilder_setSampleRate");
++    LOAD(set_data_callback, "AAudioStreamBuilder_setDataCallback");
++    LOAD(set_error_callback, "AAudioStreamBuilder_setErrorCallback");
++    LOAD(set_buffer_capacity, "AAudioStreamBuilder_setBufferCapacityInFrames");
++    LOAD(open_stream, "AAudioStreamBuilder_openStream");
++    LOAD(set_buffer_size, "AAudioStream_setBufferSizeInFrames");
++    LOAD(get_sample_rate, "AAudioStream_getSampleRate");
++    LOAD(request_start, "AAudioStream_requestStart");
++    LOAD(request_stop, "AAudioStream_requestStop");
++    LOAD(close, "AAudioStream_close");
++#undef LOAD
++
++    return true;
++}
++
++static void aaudio_fill_silence(AaudioVoiceOut *v, uint8_t *dst, size_t bytes)
++{
++    audio_pcm_info_clear_buf(&v->hw.info, dst,
++                             bytes / v->hw.info.bytes_per_frame);
++}
++
++/* Called by AAudio on its realtime thread. */
++static aaudio_data_callback_result_t aaudio_callback(
++    AAudioStream *stream, void *userData, void *audioData, int32_t numFrames)
++{
++    AaudioVoiceOut *v = userData;
++    HWVoiceOut *hw = &v->hw;
++    uint8_t *dst = audioData;
++    size_t total = (size_t)numFrames * hw->info.bytes_per_frame;
++    size_t done = 0;
++
++    qemu_mutex_lock(&v->lock);
++    if (v->exit || !v->initialized) {
++        qemu_mutex_unlock(&v->lock);
++        aaudio_fill_silence(v, dst, total);
++        return AAUDIO_CALLBACK_RESULT_CONTINUE;
++    }
++
++    while (done < total) {
++        size_t len = 0;
++        void *src = audio_generic_get_buffer_out(hw, &len);
++
++        if (!src || !len) {
++            break;
++        }
++        len = MIN(len, total - done);
++        memcpy(dst + done, src, len);
++        audio_generic_put_buffer_out(hw, src, len);
++        done += len;
++    }
++    if (done < total) {
++        aaudio_fill_silence(v, dst + done, total - done);
++    }
++    qemu_mutex_unlock(&v->lock);
++
++    return AAUDIO_CALLBACK_RESULT_CONTINUE;
++}
++
++static void aaudio_error_callback(AAudioStream *stream, void *userData,
++                                  aaudio_result_t error)
++{
++    error_report("aaudio: stream error %d", (int)error);
++}
++
++static void aaudio_fini_out(HWVoiceOut *hw)
++{
++    AaudioVoiceOut *v = (AaudioVoiceOut *)hw;
++
++    if (v->initialized) {
++        v->exit = true;
++        if (v->stream) {
++            aa.request_stop(v->stream);
++            aa.close(v->stream);
++            v->stream = NULL;
++        }
++        v->initialized = false;
++    }
++    if (v->lock_initialized) {
++        qemu_mutex_destroy(&v->lock);
++        v->lock_initialized = false;
++    }
++}
++
++static int aaudio_init_out(HWVoiceOut *hw, struct audsettings *as)
++{
++    AaudioVoiceOut *v = (AaudioVoiceOut *)hw;
++    Audiodev *dev = hw->s->dev;
++    AudiodevAaudioPerDirectionOptions *opdo = dev->u.aaudio.out;
++    AAudioStreamBuilder *builder = NULL;
++    aaudio_result_t res;
++    size_t frames;
++    int32_t capacity;
++
++    if (!aaudio_load()) {
++        error_report("aaudio: libaaudio.so is unavailable (Android < 8.0?)");
++        return -1;
++    }
++    if (as->fmt != AUDIO_FORMAT_S16) {
++        error_report("aaudio: only S16 output is supported");
++        return -1;
++    }
++    if (as->nchannels != 1 && as->nchannels != 2) {
++        error_report("aaudio: unsupported channel count %d", as->nchannels);
++        return -1;
++    }
++
++    v->dev = dev;
++    v->nbuf = 4;
++
++    qemu_mutex_init(&v->lock);
++    v->lock_initialized = true;
++
++    frames = audio_buffer_frames(
++        qapi_AudiodevAaudioPerDirectionOptions_base(opdo), as, 20000);
++
++    audio_pcm_init_info(&hw->info, as);
++    hw->samples = frames * v->nbuf;
++    audio_generic_initialize_buffer_out(hw);
++    v->period_bytes = frames * hw->info.bytes_per_frame;
++
++    res = aa.create_builder(&builder);
++    if (res != AAUDIO_OK || !builder) {
++        error_report("aaudio: createStreamBuilder failed (%d)", res);
++        aaudio_fini_out(hw);
++        return -1;
++    }
++
++    aa.set_direction(builder, AAUDIO_DIRECTION_OUTPUT);
++    aa.set_performance_mode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
++    aa.set_format(builder, AAUDIO_FORMAT_PCM_I16);
++    aa.set_channel_count(builder, as->nchannels);
++    aa.set_sample_rate(builder, as->freq);
++    aa.set_data_callback(builder, aaudio_callback, v);
++    aa.set_error_callback(builder, aaudio_error_callback, v);
++    capacity = (int32_t)(frames * v->nbuf);
++    aa.set_buffer_capacity(builder, capacity);
++
++    res = aa.open_stream(builder, &v->stream);
++    aa.builder_delete(builder);
++    if (res != AAUDIO_OK || !v->stream) {
++        error_report("aaudio: openStream failed (%d)", res);
++        aaudio_fini_out(hw);
++        return -1;
++    }
++
++    aa.set_buffer_size(v->stream, capacity);
++    /* Do not start the stream here: an idle stream started at device init
++     * produces an audible click on some devices, and the guest may not play
++     * anything for a long time.  aaudio_enable_out() starts it when the
++     * guest really begins playback (same as the OpenSL ES backend). */
++
++    v->exit = false;
++    v->initialized = true;
++    return 0;
++}
++
++static void aaudio_enable_out(HWVoiceOut *hw, bool enable)
++{
++    AaudioVoiceOut *v = (AaudioVoiceOut *)hw;
++
++    if (!v->initialized || !v->stream) {
++        return;
++    }
++    if (enable) {
++        aa.request_start(v->stream);
++    } else {
++        aa.request_stop(v->stream);
++    }
++    v->playing = enable;
++}
++
++static size_t aaudio_write(HWVoiceOut *hw, void *buf, size_t size)
++{
++    AaudioVoiceOut *v = (AaudioVoiceOut *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_write(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static size_t aaudio_buffer_get_free(HWVoiceOut *hw)
++{
++    AaudioVoiceOut *v = (AaudioVoiceOut *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_buffer_get_free(hw);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static void *aaudio_get_buffer_out(HWVoiceOut *hw, size_t *size)
++{
++    AaudioVoiceOut *v = (AaudioVoiceOut *)hw;
++    void *ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_get_buffer_out(hw, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static size_t aaudio_put_buffer_out(HWVoiceOut *hw, void *buf, size_t size)
++{
++    AaudioVoiceOut *v = (AaudioVoiceOut *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_put_buffer_out(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++/* ------------------------------------------------------------------ */
++/* Capture (microphone)                                                */
++/* ------------------------------------------------------------------ */
++
++/* Called by AAudio on its realtime thread for input streams: audioData
++ * contains the captured frames and must not be modified. */
++static aaudio_data_callback_result_t aaudio_in_callback(
++    AAudioStream *stream, void *userData, void *audioData, int32_t numFrames)
++{
++    AaudioVoiceIn *v = userData;
++    HWVoiceIn *hw = &v->hw;
++    const uint8_t *src = audioData;
++    size_t total = (size_t)numFrames * hw->info.bytes_per_frame;
++
++    qemu_mutex_lock(&v->lock);
++    if (v->exit || !v->initialized) {
++        qemu_mutex_unlock(&v->lock);
++        return AAUDIO_CALLBACK_RESULT_CONTINUE;
++    }
++
++    while (total && hw->pending_emul < hw->size_emul) {
++        size_t chunk = MIN(total, MIN(hw->size_emul - hw->pos_emul,
++                                      hw->size_emul - hw->pending_emul));
++        memcpy((uint8_t *)hw->buf_emul + hw->pos_emul, src, chunk);
++        hw->pending_emul += chunk;
++        hw->pos_emul = (hw->pos_emul + chunk) % hw->size_emul;
++        src += chunk;
++        total -= chunk;
++    }
++    qemu_mutex_unlock(&v->lock);
++
++    return AAUDIO_CALLBACK_RESULT_CONTINUE;
++}
++
++static void aaudio_fini_in(HWVoiceIn *hw)
++{
++    AaudioVoiceIn *v = (AaudioVoiceIn *)hw;
++
++    if (v->initialized) {
++        v->exit = true;
++        if (v->stream) {
++            aa.request_stop(v->stream);
++            aa.close(v->stream);
++            v->stream = NULL;
++        }
++        v->initialized = false;
++    }
++    if (v->lock_initialized) {
++        qemu_mutex_destroy(&v->lock);
++        v->lock_initialized = false;
++    }
++}
++
++static int aaudio_init_in(HWVoiceIn *hw, struct audsettings *as)
++{
++    AaudioVoiceIn *v = (AaudioVoiceIn *)hw;
++    Audiodev *dev = hw->s->dev;
++    AudiodevAaudioPerDirectionOptions *ipdo = dev->u.aaudio.in;
++    AAudioStreamBuilder *builder = NULL;
++    aaudio_result_t res;
++    size_t frames;
++    int32_t capacity;
++
++    if (!aaudio_load()) {
++        error_report("aaudio: libaaudio.so is unavailable (Android < 8.0?)");
++        return -1;
++    }
++    if (as->fmt != AUDIO_FORMAT_S16) {
++        error_report("aaudio: only S16 capture is supported");
++        return -1;
++    }
++    if (as->nchannels != 1 && as->nchannels != 2) {
++        error_report("aaudio: unsupported capture channel count %d",
++                     as->nchannels);
++        return -1;
++    }
++
++    v->dev = dev;
++
++    qemu_mutex_init(&v->lock);
++    v->lock_initialized = true;
++
++    frames = audio_buffer_frames(
++        qapi_AudiodevAaudioPerDirectionOptions_base(ipdo), as, 20000);
++
++    res = aa.create_builder(&builder);
++    if (res != AAUDIO_OK || !builder) {
++        error_report("aaudio: createStreamBuilder (capture) failed (%d)", res);
++        aaudio_fini_in(hw);
++        return -1;
++    }
++
++    aa.set_direction(builder, AAUDIO_DIRECTION_INPUT);
++    aa.set_performance_mode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
++    aa.set_format(builder, AAUDIO_FORMAT_PCM_I16);
++    aa.set_channel_count(builder, as->nchannels);
++    aa.set_sample_rate(builder, as->freq);
++    aa.set_data_callback(builder, aaudio_in_callback, v);
++    aa.set_error_callback(builder, aaudio_error_callback, v);
++    capacity = (int32_t)(frames * AAUDIO_NBUF);
++    aa.set_buffer_capacity(builder, capacity);
++
++    res = aa.open_stream(builder, &v->stream);
++    aa.builder_delete(builder);
++    if (res != AAUDIO_OK || !v->stream) {
++        error_report("aaudio: openStream (capture) failed (%d)", res);
++        aaudio_fini_in(hw);
++        return -1;
++    }
++
++    aa.set_buffer_size(v->stream, capacity);
++
++    /* AAudio may resample the stream to whatever the hardware supports;
++     * report the rate it actually uses so mixeng converts correctly. */
++    {
++        struct audsettings obt_as = *as;
++        int32_t actual = aa.get_sample_rate(v->stream);
++
++        if (actual > 0 && (unsigned)actual != obt_as.freq) {
++            error_report("aaudio: capture running at %d Hz (guest wants %u)",
++                         actual, obt_as.freq);
++            obt_as.freq = (unsigned)actual;
++        }
++        frames = audio_buffer_frames(
++            qapi_AudiodevAaudioPerDirectionOptions_base(ipdo), &obt_as, 20000);
++        audio_pcm_init_info(&hw->info, &obt_as);
++        hw->samples = frames * AAUDIO_NBUF;
++        audio_generic_initialize_buffer_in(hw);
++    }
++    /* Recording is started in aaudio_enable_in() so the microphone is not
++     * held open while the guest has capture disabled. */
++
++    v->exit = false;
++    v->recording = false;
++    v->initialized = true;
++    return 0;
++}
++
++static void aaudio_enable_in(HWVoiceIn *hw, bool enable)
++{
++    AaudioVoiceIn *v = (AaudioVoiceIn *)hw;
++
++    if (!v->initialized || !v->stream) {
++        return;
++    }
++    if (enable) {
++        aa.request_start(v->stream);
++    } else {
++        aa.request_stop(v->stream);
++    }
++    v->recording = enable;
++}
++
++static void *aaudio_get_buffer_in(HWVoiceIn *hw, size_t *size)
++{
++    AaudioVoiceIn *v = (AaudioVoiceIn *)hw;
++    void *ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_get_buffer_in(hw, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static void aaudio_put_buffer_in(HWVoiceIn *hw, void *buf, size_t size)
++{
++    AaudioVoiceIn *v = (AaudioVoiceIn *)hw;
++
++    qemu_mutex_lock(&v->lock);
++    audio_generic_put_buffer_in(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++}
++
++static size_t aaudio_read_in(HWVoiceIn *hw, void *buf, size_t size)
++{
++    AaudioVoiceIn *v = (AaudioVoiceIn *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_read(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static bool audio_aaudio_realize(AudioBackend *abe, Audiodev *dev,
++                                 Error **errp)
++{
++    return audio_aaudio_parent_class->realize(abe, dev, errp);
++}
++
++static void audio_aaudio_finalize(Object *obj)
++{
++}
++
++static void audio_aaudio_class_init(ObjectClass *klass, const void *data)
++{
++    AudioBackendClass *b = AUDIO_BACKEND_CLASS(klass);
++    AudioMixengBackendClass *k = AUDIO_MIXENG_BACKEND_CLASS(klass);
++
++    audio_aaudio_parent_class =
++        AUDIO_BACKEND_CLASS(object_class_get_parent(klass));
++
++    b->realize = audio_aaudio_realize;
++    k->max_voices_out = INT_MAX;
++    k->max_voices_in = INT_MAX;
++    k->voice_size_out = sizeof(AaudioVoiceOut);
++    k->voice_size_in = sizeof(AaudioVoiceIn);
++
++    k->init_out = aaudio_init_out;
++    k->fini_out = aaudio_fini_out;
++    k->write = aaudio_write;
++    k->buffer_get_free = aaudio_buffer_get_free;
++    k->get_buffer_out = aaudio_get_buffer_out;
++    k->put_buffer_out = aaudio_put_buffer_out;
++    k->enable_out = aaudio_enable_out;
++
++    k->init_in = aaudio_init_in;
++    k->fini_in = aaudio_fini_in;
++    k->read = aaudio_read_in;
++    k->get_buffer_in = aaudio_get_buffer_in;
++    k->put_buffer_in = aaudio_put_buffer_in;
++    k->enable_in = aaudio_enable_in;
++}
++
++static const TypeInfo audio_types[] = {
++    {
++        .name = TYPE_AUDIO_AAUDIO,
++        .parent = TYPE_AUDIO_MIXENG_BACKEND,
++        .instance_size = sizeof(AudioAaudio),
++        .instance_finalize = audio_aaudio_finalize,
++        .class_init = audio_aaudio_class_init,
++        .class_size = sizeof(AudioMixengBackendClass),
++        .abstract = false,
++    },
++};
++
++DEFINE_TYPES(audio_types)
++module_obj(TYPE_AUDIO_AAUDIO)
+diff --git a/audio/openslesaudio.c b/audio/openslesaudio.c
+--- a/audio/openslesaudio.c
++++ b/audio/openslesaudio.c
+@@ -0,0 +1,781 @@
++/*
++ * QEMU OpenSL ES audio driver (Android)
++ *
++ * Playback and capture backend using the Android Simple Buffer Queue
++ * interface.  This lets QEMU produce and record audio when the SDL audio
++ * subsystem is unavailable (for example when using -display vnc, where there
++ * is no SDL video/audio context at all).
++ *
++ * The mixeng ring buffer is pulled from the OpenSL ES callback thread and
++ * copied into fixed-size buffer-queue slots.  OpenSL ES owns the slot memory
++ * until Enqueue()d data has been consumed, so the copy is required.  For
++ * capture it is the other way round: the callback hands us filled slots which
++ * are copied into the mixeng ring and then re-enqueued.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include "qemu/osdep.h"
++#include <SLES/OpenSLES.h>
++#include <SLES/OpenSLES_Android.h>
++
++#include "qemu/module.h"
++#include "qemu/error-report.h"
++#include "qemu/thread.h"
++#include "qapi/error.h"
++#include "qemu/audio.h"
++#include "qom/object.h"
++
++#include "audio_int.h"
++
++#define TYPE_AUDIO_OPENSLES "audio-opensles"
++OBJECT_DECLARE_SIMPLE_TYPE(AudioOpenSLES, AUDIO_OPENSLES)
++
++static AudioBackendClass *audio_opensles_parent_class;
++
++struct AudioOpenSLES {
++    AudioMixengBackend parent_obj;
++};
++
++typedef struct OpenSLESVoiceOut {
++    HWVoiceOut hw;
++    Audiodev *dev;
++    bool exit;
++    bool initialized;
++    bool playing;
++
++    SLObjectItf engine_obj;
++    SLEngineItf engine;
++    SLObjectItf mix_obj;
++    SLObjectItf player_obj;
++    SLPlayItf play;
++    SLAndroidSimpleBufferQueueItf bq;
++
++    QemuMutex lock;
++    bool lock_initialized;
++
++    uint8_t *slots;
++    size_t period_bytes;
++    unsigned nbuf;
++    unsigned queued;
++    unsigned next_slot;
++} OpenSLESVoiceOut;
++
++typedef struct OpenSLESVoiceIn {
++    HWVoiceIn hw;
++    Audiodev *dev;
++    bool exit;
++    bool initialized;
++    bool recording;
++
++    SLObjectItf engine_obj;
++    SLEngineItf engine;
++    SLObjectItf recorder_obj;
++    SLRecordItf record;
++    SLAndroidSimpleBufferQueueItf bq;
++
++    QemuMutex lock;
++    bool lock_initialized;
++
++    uint8_t *slots;
++    size_t period_bytes;
++    unsigned nbuf;
++    /* Slot that is currently being filled by OpenSL ES.  Buffers are
++     * re-enqueued in the same order they were queued, so the queue can be
++     * followed with a simple round-robin index. */
++    unsigned next_slot;
++} OpenSLESVoiceIn;
++
++/* Number of buffer-queue slots per stream.  4 * period is enough to hide
++ * scheduling jitter without adding audible/recorded latency. */
++#define OPENSLES_NBUF 4
++
++static void opensles_fill_silence(OpenSLESVoiceOut *v, uint8_t *dst,
++                                  size_t bytes)
++{
++    audio_pcm_info_clear_buf(&v->hw.info, dst,
++                             bytes / v->hw.info.bytes_per_frame);
++}
++
++/* Called by OpenSL ES when one buffer queue slot has been consumed. */
++static void opensles_callback(SLAndroidSimpleBufferQueueItf bq, void *opaque)
++{
++    OpenSLESVoiceOut *v = opaque;
++    HWVoiceOut *hw = &v->hw;
++
++    qemu_mutex_lock(&v->lock);
++    if (v->exit || !v->initialized) {
++        qemu_mutex_unlock(&v->lock);
++        return;
++    }
++
++    if (v->queued > 0) {
++        v->queued--;
++    }
++
++    while (v->queued < v->nbuf) {
++                uint8_t *slot = v->slots + (size_t)v->next_slot * v->period_bytes;
++        size_t done = 0;
++
++        while (done < v->period_bytes) {
++            size_t len = 0;
++            void *src = audio_generic_get_buffer_out(hw, &len);
++
++            if (!src || !len) {
++                break;
++            }
++            len = MIN(len, v->period_bytes - done);
++            memcpy(slot + done, src, len);
++            audio_generic_put_buffer_out(hw, src, len);
++            done += len;
++        }
++
++        if (done < v->period_bytes) {
++            opensles_fill_silence(v, slot + done, v->period_bytes - done);
++        }
++        if ((*bq)->Enqueue(bq, slot, (SLuint32)v->period_bytes)
++                != SL_RESULT_SUCCESS) {
++            break;
++        }
++        v->queued++;
++        v->next_slot = (v->next_slot + 1) % v->nbuf;
++    }
++    qemu_mutex_unlock(&v->lock);
++}
++
++static void opensles_destroy(OpenSLESVoiceOut *v)
++{
++    if (v->player_obj) {
++        (*v->player_obj)->Destroy(v->player_obj);
++        v->player_obj = NULL;
++        v->play = NULL;
++        v->bq = NULL;
++    }
++    if (v->mix_obj) {
++        (*v->mix_obj)->Destroy(v->mix_obj);
++        v->mix_obj = NULL;
++    }
++    if (v->engine_obj) {
++        (*v->engine_obj)->Destroy(v->engine_obj);
++        v->engine_obj = NULL;
++        v->engine = NULL;
++    }
++}
++
++static void opensles_fini_out(HWVoiceOut *hw)
++{
++    OpenSLESVoiceOut *v = (OpenSLESVoiceOut *)hw;
++
++    if (v->initialized) {
++        v->exit = true;
++        if (v->play) {
++            (*v->play)->SetPlayState(v->play, SL_PLAYSTATE_STOPPED);
++        }
++        v->initialized = false;
++    }
++
++    opensles_destroy(v);
++
++    if (v->slots) {
++        g_free(v->slots);
++        v->slots = NULL;
++    }
++    if (v->lock_initialized) {
++        qemu_mutex_destroy(&v->lock);
++        v->lock_initialized = false;
++    }
++}
++
++static int opensles_init_out(HWVoiceOut *hw, struct audsettings *as)
++{
++    OpenSLESVoiceOut *v = (OpenSLESVoiceOut *)hw;
++    Audiodev *dev = hw->s->dev;
++    AudiodevOpenSLESPerDirectionOptions *opdo = dev->u.opensles.out;
++    SLDataLocator_AndroidSimpleBufferQueue loc_bq;
++    SLDataFormat_PCM format_pcm;
++    SLDataSource audio_src;
++    SLDataLocator_OutputMix loc_outmix;
++    SLDataSink audio_snk;
++    SLInterfaceID ids[1];
++    SLboolean req[1];
++    SLresult res;
++    size_t frames;
++
++    if (as->fmt != AUDIO_FORMAT_S16) {
++        error_report("opensles: only S16 output is supported");
++        return -1;
++    }
++    if (as->nchannels != 1 && as->nchannels != 2) {
++        error_report("opensles: unsupported channel count %d", as->nchannels);
++        return -1;
++    }
++
++    v->dev = dev;
++    /* The OpenSL ES audiodev options carry no buffer-count field; use a
++     * small fixed queue depth that is enough to hide scheduling jitter. */
++    v->nbuf = 4;
++
++    qemu_mutex_init(&v->lock);
++    v->lock_initialized = true;
++
++    res = slCreateEngine(&v->engine_obj, 0, NULL, 0, NULL, NULL);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: slCreateEngine failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->engine_obj)->Realize(v->engine_obj, SL_BOOLEAN_FALSE);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: engine Realize failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->engine_obj)->GetInterface(v->engine_obj, SL_IID_ENGINE,
++                                         &v->engine);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: GetInterface(ENGINE) failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->engine)->CreateOutputMix(v->engine, &v->mix_obj, 0, NULL, NULL);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: CreateOutputMix failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->mix_obj)->Realize(v->mix_obj, SL_BOOLEAN_FALSE);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: output mix Realize failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++
++    /* One period: honour out.buffer-length, defaulting to 20 ms. */
++    frames = audio_buffer_frames(
++        qapi_AudiodevOpenSLESPerDirectionOptions_base(opdo), as, 20000);
++
++    audio_pcm_init_info(&hw->info, as);
++    hw->samples = frames * v->nbuf;
++    audio_generic_initialize_buffer_out(hw);
++
++    v->period_bytes = frames * hw->info.bytes_per_frame;
++    v->slots = g_malloc0(v->period_bytes * v->nbuf);
++    v->queued = 0;
++    v->next_slot = 0;
++
++    loc_bq.locatorType = SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE;
++    loc_bq.numBuffers = v->nbuf;
++
++    format_pcm.formatType = SL_DATAFORMAT_PCM;
++    format_pcm.numChannels = as->nchannels;
++    /* milliHertz */
++    format_pcm.samplesPerSec = (SLuint32)as->freq * 1000;
++    format_pcm.bitsPerSample = SL_PCMSAMPLEFORMAT_FIXED_16;
++    format_pcm.containerSize = SL_PCMSAMPLEFORMAT_FIXED_16;
++    format_pcm.channelMask = as->nchannels == 1
++        ? SL_SPEAKER_FRONT_CENTER
++        : (SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT);
++    format_pcm.endianness = SL_BYTEORDER_LITTLEENDIAN;
++
++    audio_src.pLocator = &loc_bq;
++    audio_src.pFormat = &format_pcm;
++
++    loc_outmix.locatorType = SL_DATALOCATOR_OUTPUTMIX;
++    loc_outmix.outputMix = v->mix_obj;
++    audio_snk.pLocator = &loc_outmix;
++    audio_snk.pFormat = NULL;
++
++    ids[0] = SL_IID_ANDROIDSIMPLEBUFFERQUEUE;
++    req[0] = SL_BOOLEAN_TRUE;
++
++    res = (*v->engine)->CreateAudioPlayer(v->engine, &v->player_obj,
++                                          &audio_src, &audio_snk,
++                                          1, ids, req);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: CreateAudioPlayer failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->player_obj)->Realize(v->player_obj, SL_BOOLEAN_FALSE);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: player Realize failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->player_obj)->GetInterface(v->player_obj, SL_IID_PLAY,
++                                         &v->play);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: GetInterface(PLAY) failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->player_obj)->GetInterface(
++        v->player_obj, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &v->bq);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: GetInterface(BUFFERQUEUE) failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++    res = (*v->bq)->RegisterCallback(v->bq, opensles_callback, v);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: RegisterCallback failed (%u)", res);
++        opensles_fini_out(hw);
++        return -1;
++    }
++
++    /* Prime the queue with silence so playback starts immediately. */
++    for (unsigned i = 0; i < v->nbuf; i++) {
++        (*v->bq)->Enqueue(v->bq, v->slots + (size_t)i * v->period_bytes,
++                          (SLuint32)v->period_bytes);
++        v->queued++;
++    }
++    v->next_slot = 0;
++
++    v->exit = false;
++    v->initialized = true;
++    return 0;
++}
++
++static void opensles_enable_out(HWVoiceOut *hw, bool enable)
++{
++    OpenSLESVoiceOut *v = (OpenSLESVoiceOut *)hw;
++
++    if (!v->initialized || !v->play) {
++        return;
++    }
++    (*v->play)->SetPlayState(v->play, enable ? SL_PLAYSTATE_PLAYING
++                                             : SL_PLAYSTATE_PAUSED);
++    v->playing = enable;
++}
++
++static size_t opensles_write(HWVoiceOut *hw, void *buf, size_t size)
++{
++    OpenSLESVoiceOut *v = (OpenSLESVoiceOut *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_write(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static size_t opensles_buffer_get_free(HWVoiceOut *hw)
++{
++    OpenSLESVoiceOut *v = (OpenSLESVoiceOut *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_buffer_get_free(hw);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static void *opensles_get_buffer_out(HWVoiceOut *hw, size_t *size)
++{
++    OpenSLESVoiceOut *v = (OpenSLESVoiceOut *)hw;
++    void *ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_get_buffer_out(hw, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static size_t opensles_put_buffer_out(HWVoiceOut *hw, void *buf, size_t size)
++{
++    OpenSLESVoiceOut *v = (OpenSLESVoiceOut *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_put_buffer_out(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++/* ------------------------------------------------------------------ */
++/* Capture (microphone)                                                */
++/* ------------------------------------------------------------------ */
++
++static void opensles_in_destroy(OpenSLESVoiceIn *v)
++{
++    if (v->recorder_obj) {
++        (*v->recorder_obj)->Destroy(v->recorder_obj);
++        v->recorder_obj = NULL;
++        v->record = NULL;
++        v->bq = NULL;
++    }
++    if (v->engine_obj) {
++        (*v->engine_obj)->Destroy(v->engine_obj);
++        v->engine_obj = NULL;
++        v->engine = NULL;
++    }
++}
++
++/* Called by OpenSL ES when one buffer queue slot has been filled.  The
++ * callback only names the buffer queue, not the buffer, so slots are
++ * recycled in the order they were enqueued. */
++static void opensles_in_callback(SLAndroidSimpleBufferQueueItf bq, void *opaque)
++{
++    OpenSLESVoiceIn *v = opaque;
++    HWVoiceIn *hw = &v->hw;
++    unsigned slot;
++    const uint8_t *src;
++    size_t left;
++
++    qemu_mutex_lock(&v->lock);
++    if (!v->initialized) {
++        qemu_mutex_unlock(&v->lock);
++        return;
++    }
++
++    slot = v->next_slot;
++    v->next_slot = (v->next_slot + 1) % v->nbuf;
++
++    if (!v->exit) {
++        src = v->slots + (size_t)slot * v->period_bytes;
++        left = v->period_bytes;
++        while (left && hw->pending_emul < hw->size_emul) {
++            size_t chunk = MIN(left, MIN(hw->size_emul - hw->pos_emul,
++                                         hw->size_emul - hw->pending_emul));
++            memcpy((uint8_t *)hw->buf_emul + hw->pos_emul, src, chunk);
++            hw->pending_emul += chunk;
++            hw->pos_emul = (hw->pos_emul + chunk) % hw->size_emul;
++            src += chunk;
++            left -= chunk;
++        }
++        /* If the ring is full the newest samples are dropped; the guest is
++         * not consuming, so there is nothing better to do. */
++    }
++
++    /* Recycling the buffer keeps the recorder running even while the guest
++     * has capture disabled; the data is simply discarded above. */
++    (*bq)->Enqueue(bq, v->slots + (size_t)slot * v->period_bytes,
++                   (SLuint32)v->period_bytes);
++    qemu_mutex_unlock(&v->lock);
++}
++
++static void opensles_fini_in(HWVoiceIn *hw)
++{
++    OpenSLESVoiceIn *v = (OpenSLESVoiceIn *)hw;
++
++    if (v->initialized) {
++        v->exit = true;
++        if (v->record) {
++            (*v->record)->SetRecordState(v->record, SL_RECORDSTATE_STOPPED);
++        }
++        v->initialized = false;
++    }
++
++    opensles_in_destroy(v);
++
++    if (v->slots) {
++        g_free(v->slots);
++        v->slots = NULL;
++    }
++    if (v->lock_initialized) {
++        qemu_mutex_destroy(&v->lock);
++        v->lock_initialized = false;
++    }
++}
++
++static int opensles_init_in(HWVoiceIn *hw, struct audsettings *as)
++{
++    OpenSLESVoiceIn *v = (OpenSLESVoiceIn *)hw;
++    Audiodev *dev = hw->s->dev;
++    AudiodevOpenSLESPerDirectionOptions *ipdo = dev->u.opensles.in;
++    SLDataLocator_AndroidSimpleBufferQueue loc_bq;
++    SLDataLocator_IODevice loc_dev;
++    SLDataFormat_PCM format_pcm;
++    SLDataSource audio_src;
++    SLDataSink audio_snk;
++    SLInterfaceID ids[1];
++    SLboolean req[1];
++    SLresult res;
++    size_t frames;
++
++    if (as->fmt != AUDIO_FORMAT_S16) {
++        error_report("opensles: only S16 capture is supported");
++        return -1;
++    }
++    if (as->nchannels != 1 && as->nchannels != 2) {
++        error_report("opensles: unsupported capture channel count %d",
++                     as->nchannels);
++        return -1;
++    }
++
++    v->dev = dev;
++    v->nbuf = OPENSLES_NBUF;
++
++    qemu_mutex_init(&v->lock);
++    v->lock_initialized = true;
++
++    res = slCreateEngine(&v->engine_obj, 0, NULL, 0, NULL, NULL);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: slCreateEngine (capture) failed (%u)", res);
++        opensles_fini_in(hw);
++        return -1;
++    }
++    res = (*v->engine_obj)->Realize(v->engine_obj, SL_BOOLEAN_FALSE);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: capture engine Realize failed (%u)", res);
++        opensles_fini_in(hw);
++        return -1;
++    }
++    res = (*v->engine_obj)->GetInterface(v->engine_obj, SL_IID_ENGINE,
++                                         &v->engine);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: GetInterface(ENGINE, capture) failed (%u)",
++                     res);
++        opensles_fini_in(hw);
++        return -1;
++    }
++
++    /* A recorder reads from the default audio input device and writes into
++     * the buffer queue - the reverse of a player. */
++    loc_dev.locatorType = SL_DATALOCATOR_IODEVICE;
++    loc_dev.deviceType = SL_IODEVICE_AUDIOINPUT;
++    loc_dev.deviceID = SL_DEFAULTDEVICEID_AUDIOINPUT;
++    loc_dev.device = NULL;
++    audio_src.pLocator = &loc_dev;
++    audio_src.pFormat = NULL;
++
++    loc_bq.locatorType = SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE;
++    loc_bq.numBuffers = v->nbuf;
++
++    format_pcm.formatType = SL_DATAFORMAT_PCM;
++    format_pcm.numChannels = as->nchannels;
++    format_pcm.bitsPerSample = SL_PCMSAMPLEFORMAT_FIXED_16;
++    format_pcm.containerSize = SL_PCMSAMPLEFORMAT_FIXED_16;
++    format_pcm.channelMask = as->nchannels == 1
++        ? SL_SPEAKER_FRONT_CENTER
++        : (SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT);
++    format_pcm.endianness = SL_BYTEORDER_LITTLEENDIAN;
++
++    audio_snk.pLocator = &loc_bq;
++    audio_snk.pFormat = &format_pcm;
++
++    ids[0] = SL_IID_ANDROIDSIMPLEBUFFERQUEUE;
++    req[0] = SL_BOOLEAN_TRUE;
++
++    /* The recorder has to be created at a rate the hardware supports for
++     * capture; many Android devices only offer 48 kHz.  QEMU's mixeng layer
++     * resamples whatever rate we report in hw->info, so fall back to a
++     * supported one instead of failing the voice. */
++    {
++        static const unsigned alt_rates[] = { 48000, 44100, 16000 };
++        struct audsettings obt_as = *as;
++        unsigned chosen_rate = as->freq;
++        unsigned chosen_ch = as->nchannels;
++        bool created = false;
++        unsigned c, i;
++
++        for (c = 0; c < 2 && !created; c++) {
++            unsigned nch = c == 0 ? as->nchannels : 1;
++
++            if (c > 0 && nch == as->nchannels) {
++                continue;
++            }
++            format_pcm.numChannels = nch;
++            format_pcm.channelMask = nch == 1
++                ? SL_SPEAKER_FRONT_CENTER
++                : (SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT);
++
++            for (i = 0; i <= ARRAY_SIZE(alt_rates); i++) {
++                unsigned rate = i == 0 ? as->freq : alt_rates[i - 1];
++
++                if (i > 0 && rate == as->freq) {
++                    continue;
++                }
++                format_pcm.samplesPerSec = (SLuint32)rate * 1000;
++                res = (*v->engine)->CreateAudioRecorder(v->engine,
++                                                        &v->recorder_obj,
++                                                        &audio_src, &audio_snk,
++                                                        1, ids, req);
++                if (res == SL_RESULT_SUCCESS) {
++                    chosen_rate = rate;
++                    chosen_ch = nch;
++                    created = true;
++                    break;
++                }
++                error_report("opensles: CreateAudioRecorder(%u Hz, %u ch) "
++                             "failed (%u)", rate, nch, res);
++            }
++        }
++        if (!created) {
++            opensles_fini_in(hw);
++            return -1;
++        }
++        if (chosen_rate != as->freq || chosen_ch != as->nchannels) {
++            error_report("opensles: capture running at %u Hz/%u ch "
++                         "(guest wants %u Hz/%u ch)", chosen_rate, chosen_ch,
++                         as->freq, as->nchannels);
++        }
++
++        obt_as.freq = chosen_rate;
++        obt_as.nchannels = chosen_ch;
++        frames = audio_buffer_frames(
++            qapi_AudiodevOpenSLESPerDirectionOptions_base(ipdo), &obt_as, 20000);
++        audio_pcm_init_info(&hw->info, &obt_as);
++        hw->samples = frames * v->nbuf;
++        audio_generic_initialize_buffer_in(hw);
++        v->period_bytes = frames * hw->info.bytes_per_frame;
++        v->slots = g_malloc0(v->period_bytes * v->nbuf);
++        v->next_slot = 0;
++        /* Pre-fill one period with silence.  The guest opens the PCM and
++         * starts reading immediately, but OpenSL ES only hands us the first
++         * filled buffer one period later; without this the HDA capture
++         * stream gives up with EIO before any data arrives. */
++        memset(hw->buf_emul, 0, v->period_bytes);
++        hw->pending_emul = v->period_bytes;
++        hw->pos_emul = v->period_bytes % hw->size_emul;
++    }
++    res = (*v->recorder_obj)->Realize(v->recorder_obj, SL_BOOLEAN_FALSE);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: recorder Realize failed (%u)", res);
++        opensles_fini_in(hw);
++        return -1;
++    }
++    res = (*v->recorder_obj)->GetInterface(v->recorder_obj, SL_IID_RECORD,
++                                           &v->record);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: GetInterface(RECORD) failed (%u)", res);
++        opensles_fini_in(hw);
++        return -1;
++    }
++    res = (*v->recorder_obj)->GetInterface(
++        v->recorder_obj, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &v->bq);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: GetInterface(BUFFERQUEUE, capture) failed (%u)",
++                     res);
++        opensles_fini_in(hw);
++        return -1;
++    }
++    res = (*v->bq)->RegisterCallback(v->bq, opensles_in_callback, v);
++    if (res != SL_RESULT_SUCCESS) {
++        error_report("opensles: RegisterCallback (capture) failed (%u)", res);
++        opensles_fini_in(hw);
++        return -1;
++    }
++
++    /* Arm the queue; recording itself starts in opensles_enable_in(). */
++    for (unsigned i = 0; i < v->nbuf; i++) {
++        res = (*v->bq)->Enqueue(v->bq,
++                                v->slots + (size_t)i * v->period_bytes,
++                                (SLuint32)v->period_bytes);
++        if (res != SL_RESULT_SUCCESS) {
++            error_report("opensles: capture Enqueue failed (%u)", res);
++            opensles_fini_in(hw);
++            return -1;
++        }
++    }
++
++    v->exit = false;
++    v->recording = false;
++    v->initialized = true;
++    return 0;
++}
++
++static void opensles_enable_in(HWVoiceIn *hw, bool enable)
++{
++    OpenSLESVoiceIn *v = (OpenSLESVoiceIn *)hw;
++
++    if (!v->initialized || !v->record) {
++        return;
++    }
++    (*v->record)->SetRecordState(v->record, enable ? SL_RECORDSTATE_RECORDING
++                                                   : SL_RECORDSTATE_STOPPED);
++    v->recording = enable;
++}
++
++static void *opensles_get_buffer_in(HWVoiceIn *hw, size_t *size)
++{
++    OpenSLESVoiceIn *v = (OpenSLESVoiceIn *)hw;
++    void *ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_get_buffer_in(hw, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static void opensles_put_buffer_in(HWVoiceIn *hw, void *buf, size_t size)
++{
++    OpenSLESVoiceIn *v = (OpenSLESVoiceIn *)hw;
++
++    qemu_mutex_lock(&v->lock);
++    audio_generic_put_buffer_in(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++}
++
++static size_t opensles_read_in(HWVoiceIn *hw, void *buf, size_t size)
++{
++    OpenSLESVoiceIn *v = (OpenSLESVoiceIn *)hw;
++    size_t ret;
++
++    qemu_mutex_lock(&v->lock);
++    ret = audio_generic_read(hw, buf, size);
++    qemu_mutex_unlock(&v->lock);
++
++    return ret;
++}
++
++static bool audio_opensles_realize(AudioBackend *abe, Audiodev *dev,
++                                   Error **errp)
++{
++    return audio_opensles_parent_class->realize(abe, dev, errp);
++}
++
++static void audio_opensles_finalize(Object *obj)
++{
++}
++
++static void audio_opensles_class_init(ObjectClass *klass, const void *data)
++{
++    AudioBackendClass *b = AUDIO_BACKEND_CLASS(klass);
++    AudioMixengBackendClass *k = AUDIO_MIXENG_BACKEND_CLASS(klass);
++
++    audio_opensles_parent_class =
++        AUDIO_BACKEND_CLASS(object_class_get_parent(klass));
++
++    b->realize = audio_opensles_realize;
++    k->max_voices_out = INT_MAX;
++    k->max_voices_in = INT_MAX;
++    k->voice_size_out = sizeof(OpenSLESVoiceOut);
++    k->voice_size_in = sizeof(OpenSLESVoiceIn);
++
++    k->init_out = opensles_init_out;
++    k->fini_out = opensles_fini_out;
++    k->write = opensles_write;
++    k->buffer_get_free = opensles_buffer_get_free;
++    k->get_buffer_out = opensles_get_buffer_out;
++    k->put_buffer_out = opensles_put_buffer_out;
++    k->enable_out = opensles_enable_out;
++
++    k->init_in = opensles_init_in;
++    k->fini_in = opensles_fini_in;
++    k->read = opensles_read_in;
++    k->get_buffer_in = opensles_get_buffer_in;
++    k->put_buffer_in = opensles_put_buffer_in;
++    k->enable_in = opensles_enable_in;
++}
++
++static const TypeInfo audio_types[] = {
++    {
++        .name = TYPE_AUDIO_OPENSLES,
++        .parent = TYPE_AUDIO_MIXENG_BACKEND,
++        .instance_size = sizeof(AudioOpenSLES),
++        .class_init = audio_opensles_class_init,
++        .instance_finalize = audio_opensles_finalize,
++    },
++};
++
++DEFINE_TYPES(audio_types)
++module_obj(TYPE_AUDIO_OPENSLES);
+diff --git a/audio/audio.c b/audio/audio.c
+--- a/audio/audio.c
++++ b/audio/audio.c
+@@ -204,6 +204,12 @@
+ #ifdef CONFIG_AUDIO_OSS
+         CASE(OSS, oss, Oss);
+ #endif
++#ifdef CONFIG_AUDIO_OPENSLES
++        CASE(OPENSLES, opensles, OpenSLES);
++#endif
++#ifdef CONFIG_AUDIO_AAUDIO
++        CASE(AAUDIO, aaudio, Aaudio);
++#endif
+ #ifdef CONFIG_AUDIO_PA
+         CASE(PA, pa, Pa);
+ #endif
+@@ -296,6 +302,16 @@
+     case AUDIODEV_DRIVER_OSS:
+         return qapi_AudiodevOssPerDirectionOptions_base(dev->u.oss.out);
+ #endif
++#ifdef CONFIG_AUDIO_OPENSLES
++    case AUDIODEV_DRIVER_OPENSLES:
++        return qapi_AudiodevOpenSLESPerDirectionOptions_base(
++            dev->u.opensles.out);
++#endif
++#ifdef CONFIG_AUDIO_AAUDIO
++    case AUDIODEV_DRIVER_AAUDIO:
++        return qapi_AudiodevAaudioPerDirectionOptions_base(
++            dev->u.aaudio.out);
++#endif
+ #ifdef CONFIG_AUDIO_PA
+     case AUDIODEV_DRIVER_PA:
+         return qapi_AudiodevPaPerDirectionOptions_base(dev->u.pa.out);
+@@ -355,6 +371,16 @@
+     case AUDIODEV_DRIVER_OSS:
+         return qapi_AudiodevOssPerDirectionOptions_base(dev->u.oss.in);
+ #endif
++#ifdef CONFIG_AUDIO_OPENSLES
++    case AUDIODEV_DRIVER_OPENSLES:
++        return qapi_AudiodevOpenSLESPerDirectionOptions_base(
++            dev->u.opensles.in);
++#endif
++#ifdef CONFIG_AUDIO_AAUDIO
++    case AUDIODEV_DRIVER_AAUDIO:
++        return qapi_AudiodevAaudioPerDirectionOptions_base(
++            dev->u.aaudio.in);
++#endif
+ #ifdef CONFIG_AUDIO_PA
+     case AUDIODEV_DRIVER_PA:
+         return qapi_AudiodevPaPerDirectionOptions_base(dev->u.pa.in);
+diff --git a/audio/audio_template.h b/audio/audio_template.h
+--- a/audio/audio_template.h
++++ b/audio/audio_template.h
+@@ -366,6 +366,16 @@
+     case AUDIODEV_DRIVER_OSS:
+         return qapi_AudiodevOssPerDirectionOptions_base(dev->u.oss.TYPE);
+ #endif
++#ifdef CONFIG_AUDIO_OPENSLES
++    case AUDIODEV_DRIVER_OPENSLES:
++        return qapi_AudiodevOpenSLESPerDirectionOptions_base(
++            dev->u.opensles.TYPE);
++#endif
++#ifdef CONFIG_AUDIO_AAUDIO
++    case AUDIODEV_DRIVER_AAUDIO:
++        return qapi_AudiodevAaudioPerDirectionOptions_base(
++            dev->u.aaudio.TYPE);
++#endif
+ #ifdef CONFIG_AUDIO_PA
+     case AUDIODEV_DRIVER_PA:
+         return qapi_AudiodevPaPerDirectionOptions_base(dev->u.pa.TYPE);
+diff --git a/audio/meson.build b/audio/meson.build
+--- a/audio/meson.build
++++ b/audio/meson.build
+@@ -16,6 +16,8 @@
+   ['alsa', alsa, files('alsaaudio.c')],
+   ['coreaudio', coreaudio, files('coreaudio.m')],
+   ['dsound', dsound, files('dsoundaudio.c', 'audio_win_int.c')],
++  ['opensles', opensles, files('openslesaudio.c')],
++  ['aaudio', aaudio, files('aaudioaudio.c')],
+   ['oss', oss, files('ossaudio.c')],
+   ['pa', pulse, files('paaudio.c')],
+   ['sdl', sdl, files('sdlaudio.c')],
+diff --git a/qapi/audio.json b/qapi/audio.json
+--- a/qapi/audio.json
++++ b/qapi/audio.json
+@@ -420,6 +420,60 @@
+     '*out': 'AudiodevSdlPerDirectionOptions' } }
+ 
+ ##
++# @AudiodevOpenSLESPerDirectionOptions:
++#
++# Options of the OpenSL ES audio backend per direction.
++#
++# Since: 11.2
++##
++{ 'struct': 'AudiodevOpenSLESPerDirectionOptions',
++  'base': 'AudiodevPerDirectionOptions',
++  'data': { } }
++
++##
++# @AudiodevOpenSLESOptions:
++#
++# Options of the OpenSL ES audio backend (Android).
++#
++# @in: options of the recording stream
++#
++# @out: options of the playback stream
++#
++# Since: 11.2
++##
++{ 'struct': 'AudiodevOpenSLESOptions',
++  'data': {
++    '*in':  'AudiodevOpenSLESPerDirectionOptions',
++    '*out': 'AudiodevOpenSLESPerDirectionOptions' } }
++
++##
++# @AudiodevAaudioPerDirectionOptions:
++#
++# Options of the AAudio audio backend per direction.
++#
++# Since: 11.2
++##
++{ 'struct': 'AudiodevAaudioPerDirectionOptions',
++  'base': 'AudiodevPerDirectionOptions',
++  'data': { } }
++
++##
++# @AudiodevAaudioOptions:
++#
++# Options of the AAudio audio backend (Android).
++#
++# @in: options of the recording stream
++#
++# @out: options of the playback stream
++#
++# Since: 11.2
++##
++{ 'struct': 'AudiodevAaudioOptions',
++  'data': {
++    '*in':  'AudiodevAaudioPerDirectionOptions',
++    '*out': 'AudiodevAaudioPerDirectionOptions' } }
++
++##
+ # @AudiodevWavOptions:
+ #
+ # Options of the wav audio backend.
+@@ -481,6 +535,8 @@
+             { 'name': 'oss', 'if': 'CONFIG_AUDIO_OSS' },
+             { 'name': 'pa', 'if': 'CONFIG_AUDIO_PA' },
+             { 'name': 'pipewire', 'if': 'CONFIG_AUDIO_PIPEWIRE' },
++            { 'name': 'opensles', 'if': 'CONFIG_AUDIO_OPENSLES' },
++            { 'name': 'aaudio', 'if': 'CONFIG_AUDIO_AAUDIO' },
+             { 'name': 'sdl', 'if': 'CONFIG_AUDIO_SDL' },
+             { 'name': 'sndio', 'if': 'CONFIG_AUDIO_SNDIO' },
+             { 'name': 'spice', 'if': 'CONFIG_SPICE' },
+@@ -524,6 +580,10 @@
+                    'if': 'CONFIG_AUDIO_PA' },
+     'pipewire':  { 'type': 'AudiodevPipewireOptions',
+                    'if': 'CONFIG_AUDIO_PIPEWIRE' },
++    'opensles':  { 'type': 'AudiodevOpenSLESOptions',
++                   'if': 'CONFIG_AUDIO_OPENSLES' },
++    'aaudio':    { 'type': 'AudiodevAaudioOptions',
++                   'if': 'CONFIG_AUDIO_AAUDIO' },
+     'sdl':       { 'type': 'AudiodevSdlOptions',
+                    'if': 'CONFIG_AUDIO_SDL' },
+     'sndio':     { 'type': 'AudiodevSndioOptions',
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -1625,6 +1625,12 @@
+   sdl = dependency('sdl2', required: get_option('sdl'))
+   sdl_image = not_found
+ endif
++# Limbo: Android OpenSL ES / AAudio audio backends
++opensles = cc.find_library('OpenSLES', required: false)
++aaudio = not_found
++if cc.has_header('aaudio/AAudio.h')
++  aaudio = declare_dependency(link_args: '-ldl')
++endif
+ if sdl.found()
+   # Some versions of SDL have problems with -Wundef
+   if not cc.compiles('''
+@@ -2282,6 +2288,8 @@
+     'coreaudio': coreaudio.found(),
+     'dsound': dsound.found(),
+     'jack': jack.found(),
++    'opensles': opensles.found(),
++    'aaudio': aaudio.found(),
+     'oss': oss.found(),
+     'pa': pulse.found(),
+     'pipewire': pipewire.found(),
+diff --git a/meson_options.txt b/meson_options.txt
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -19,7 +19,7 @@
+ option('default_devices', type : 'boolean', value : true,
+        description: 'Include a default selection of devices in emulators')
+ option('audio_drv_list', type: 'array', value: ['default'],
+-       choices: ['alsa', 'coreaudio', 'default', 'dsound', 'jack', 'oss', 'pa', 'pipewire', 'sdl', 'sndio'],
++       choices: ['aaudio', 'alsa', 'coreaudio', 'default', 'dsound', 'jack', 'opensles', 'oss', 'pa', 'pipewire', 'sdl', 'sndio'],
+        description: 'Set audio driver list')
+ option('block_drv_rw_whitelist', type : 'string', value : '',
+        description: 'set block driver read-write whitelist (by default affects only QEMU, not tools like qemu-img)')

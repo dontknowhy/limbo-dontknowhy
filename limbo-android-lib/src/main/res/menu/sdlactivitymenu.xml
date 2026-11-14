@@ -106,4 +106,9 @@
         android:title="@string/ctrl_alt_del" />
 
 
+    <item
+        android:id="@+id/itemSpecialKeys"
+        android:icon="@drawable/keyboard"
+        android:title="@string/special_keys_bar" />
+
 </menu>

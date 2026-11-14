@@ -41,6 +41,8 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.view.View.OnClickListener;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
@@ -58,6 +60,9 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.appcompat.app.ActionBar;
+import com.max2idea.android.limbo.ui.DvdScreensaverView;
+import com.max2idea.android.limbo.ui.ScreenSaver;
+import com.max2idea.android.limbo.ui.SpecialKeysBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
@@ -70,6 +75,7 @@ import com.max2idea.android.limbo.files.FileInstaller;
 import com.max2idea.android.limbo.files.FileUtils;
 import com.max2idea.android.limbo.help.Help;
 import com.max2idea.android.limbo.install.Installer;
+import com.max2idea.android.limbo.jni.VMExecutor;
 import com.max2idea.android.limbo.keyboard.KeyboardUtils;
 import com.max2idea.android.limbo.log.Logger;
 import com.max2idea.android.limbo.machine.ArchDefinitions;
@@ -84,6 +90,7 @@ import com.max2idea.android.limbo.machine.MachineFilePaths;
 import com.max2idea.android.limbo.machine.MachineImporter;
 import com.max2idea.android.limbo.machine.MachineProperty;
 import com.max2idea.android.limbo.network.NetworkUtils;
+import com.max2idea.android.limbo.qmp.QmpClient;
 import com.max2idea.android.limbo.toast.ToastUtils;
 import com.max2idea.android.limbo.ui.SpinnerAdapter;
 import com.max2idea.android.limbo.updates.UpdateChecker;
@@ -116,6 +123,7 @@ public class LimboActivity extends AppCompatActivity
     private static final int SETTINGS = 13;
     private static final int TOOLS = 14;
     private static final int IMPORT_BIOS_FILE = 15;
+    private static final int SPECIAL_KEYS = 16;
 
     // disk mapping
     private static final Hashtable<FileType, DiskInfo> diskMapping = new Hashtable<>();
@@ -959,6 +967,7 @@ public class LimboActivity extends AppCompatActivity
         clearNotifications();
         setupStrictMode();
         setContentView(R.layout.limbo_main);
+        applyBackgroundIfEnabled();
         setupWidgets();
         setupController();
         setupDiskMapping();
@@ -966,6 +975,7 @@ public class LimboActivity extends AppCompatActivity
         populateAttributesUI();
         checkFirstLaunch();
         setupToolbar();
+        setupScreenSaver();
         checkUpdate();
         checkLog();
         checkAndLoadLibs();
@@ -973,17 +983,112 @@ public class LimboActivity extends AppCompatActivity
         setupListeners();
     }
 
+    private ScreenSaver screenSaver;
+    private SpecialKeysBar specialKeysBar;
+    private View screenSaverOverlay;
+
+    /**
+     * VNC view screen saver: the phone only shows the machine list while the
+     * guest is displayed elsewhere, so after the idle timeout we go immersive
+     * and play the classic bouncing DVD logo (no text, tap anywhere to leave).
+     */
+    private void setupScreenSaver() {
+        screenSaver = new ScreenSaver(this, new ScreenSaver.Callbacks() {
+            @Override
+            public void onEnter() {
+                showScreenSaverOverlay(true);
+                ScreenSaver.setImmersive(LimboActivity.this, true);
+            }
+
+            @Override
+            public void onExit() {
+                showScreenSaverOverlay(false);
+                ScreenSaver.setImmersive(LimboActivity.this, false);
+            }
+        });
+        screenSaver.setGate(new ScreenSaver.Gate() {
+            @Override
+            public boolean allow() {
+                /* No screensaver while the soft keyboard is up: it would eat
+                 * the IME's key events. */
+                return MachineController.getInstance().isRunning()
+                        && MachineController.getInstance().isVNCEnabled()
+                        && !ScreenSaver.isImeVisible(LimboActivity.this);
+            }
+        });
+        screenSaver.setShowToast(true);
+        screenSaver.setTimeoutSeconds(LimboSettingsManager.getScreensaverTimeout(this));
+    }
+
+    private void showScreenSaverOverlay(boolean show) {
+        ViewGroup root = findViewById(android.R.id.content);
+        if (root == null) {
+            return;
+        }
+        if (show) {
+            if (screenSaverOverlay == null) {
+                FrameLayout frame = new FrameLayout(this);
+                frame.setBackgroundColor(android.graphics.Color.BLACK);
+                /* Swallow taps so they do not reach the UI underneath. */
+                frame.setClickable(true);
+                frame.addView(new DvdScreensaverView(this),
+                        new FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT));
+                screenSaverOverlay = frame;
+            }
+            if (screenSaverOverlay.getParent() == null) {
+                root.addView(screenSaverOverlay, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+            screenSaverOverlay.bringToFront();
+        } else if (screenSaverOverlay != null && screenSaverOverlay.getParent() != null) {
+            ((ViewGroup) screenSaverOverlay.getParent()).removeView(screenSaverOverlay);
+        }
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        if (screenSaver != null
+                && (ev.getActionMasked() == android.view.MotionEvent.ACTION_DOWN
+                    || ev.getActionMasked() == android.view.MotionEvent.ACTION_POINTER_DOWN)
+                && screenSaver.onUserInput()) {
+            return true;
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (screenSaver != null && screenSaver.onUserInput()) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
     private void setupAppEnvironment() {
         LimboApplication.setupEnv(this);
-        boolean isBackgroundLinusEnabled = LimboSettingsManager.getBackgroundLinus(this);
-        Log.d("Limbo", "Background Linus Enabled: " + isBackgroundLinusEnabled);
-        Log.d("TODO", "Setting Background doesn't work,Fix that Later.");
-        if (LimboSettingsManager.getBackgroundLinus(this)) {
-            setContentView(R.layout.limbo_main);
-            View setBackground = findViewById(R.id.main_layout);
-            Drawable drawable = ContextCompat.getDrawable(this, R.drawable.ys);
-            setBackground.setBackground(drawable);
-        }
+        Log.d("Limbo", "Background enabled: "
+                + LimboSettingsManager.getBackgroundLinus(this));
+    }
+
+    /* LIMBO: the preference must be applied after setContentView(), otherwise
+     * the inflated layout replaces the window background.  The image keeps
+     * its aspect ratio (no stretching); overflow is clipped. */
+    private void applyBackgroundIfEnabled() {
+        View content = findViewById(android.R.id.content);
+        /* LIMBO: the switch selects the Genshin wallpaper; with the switch
+         * off the original aerograss background is shown instead. */
+        boolean genshin = LimboSettingsManager.getBackgroundLinus(this);
+        android.graphics.Bitmap bmp = android.graphics.BitmapFactory
+                .decodeResource(getResources(),
+                        genshin ? R.drawable.ys : R.drawable.aerograss);
+        android.graphics.drawable.BitmapDrawable bd =
+                new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
+        bd.setGravity(genshin ? android.view.Gravity.FILL
+                               : android.view.Gravity.CENTER);
+        content.setBackground(bd);
     }
 
     private void setupController() {
@@ -1185,11 +1290,10 @@ public class LimboActivity extends AppCompatActivity
     public void setupNativeLibs() {
         if (libLoaded)
             return;
-        //Compatibility lib
-        System.loadLibrary("compat-limbo");
-
-        //Glib deps
-        System.loadLibrary("compat-musl");
+        // LIMBO: the old libcompat-limbo.so is merged into liblimbo.so (it was
+        // only set_jni() + Android_JNI_SetVMResolution() + nativeAddFd()).
+        // iconv/intl are provided by GNU libiconv, the old compat-musl shim
+        // is no longer shipped.
 
         //Glib
         System.loadLibrary("glib-2.0");
@@ -1199,12 +1303,10 @@ public class LimboActivity extends AppCompatActivity
 
         // SDL library
         if (Config.enable_SDL) {
-            if (Build.VERSION.SDK_INT >= 26)
-                System.loadLibrary("compat-SDL2-addons");
+            // LIMBO: SDL2 2.32 is used directly; the old addons/extensions
+            // shims (AAUDIO, extra Java hooks) are no longer shipped.
             System.loadLibrary("SDL2");
         }
-
-        System.loadLibrary("compat-SDL2-ext");
 
         //Limbo needed for vmexecutor
         System.loadLibrary("limbo");
@@ -1455,8 +1557,16 @@ public class LimboActivity extends AppCompatActivity
     // Main event function
     // Retrives values from saved preferences
     private void onStartButton() {
-
+        Log.i("LimboDBG", "onStartButton pos=" + mMachine.getSelectedItemPosition()
+                + " machine=" + getMachine());
+        if (VMExecutor.isQemuInitialized()) {
+            /* QEMU already ran in this process.  The service exits the app
+             * when a VM stops, so this should not happen; fail loudly. */
+            ToastUtils.toastLong(this, getString(R.string.RestartingForQemu));
+            return;
+        }
         if (mMachine.getSelectedItemPosition() == 0 || getMachine() == null) {
+            Log.i("LimboDBG", "bail: no machine selected");
             ToastUtils.toastShort(LimboActivity.this, getString(R.string.SelectOrCreateVirtualMachineFirst));
             return;
         }
@@ -1464,15 +1574,19 @@ public class LimboActivity extends AppCompatActivity
         mStart.requestFocus();
 
         if (!validateFiles()) {
+            Log.i("LimboDBG", "bail: validateFiles false hda=" + getMachine().getHdaImagePath()
+                    + " kernel=" + getMachine().getKernel() + " initrd=" + getMachine().getInitRd());
             return;
         }
 
         try {
             createMachineDir(MachineController.getInstance().getMachineSaveDir());
         } catch (Exception ex) {
+            Log.i("LimboDBG", "bail: createMachineDir " + ex);
             ToastUtils.toastLong(LimboActivity.this, getString(R.string.Error) + ": " + ex);
             return;
         }
+        Log.i("LimboDBG", "starting, vnc=" + getMachine().getEnableVNC());
 
         // XXX: save the user defined dns server before we start the vm
         LimboSettingsManager.setDNSServer(this, mDNS.getText().toString());
@@ -1527,16 +1641,19 @@ public class LimboActivity extends AppCompatActivity
     }
 
     private boolean validateFiles() {
-        return FileUtils.fileValid(getMachine().getHdaImagePath())
-                && FileUtils.fileValid(getMachine().getHdbImagePath())
-                && FileUtils.fileValid(getMachine().getHdcImagePath())
-                && FileUtils.fileValid(getMachine().getHddImagePath())
-                && FileUtils.fileValid(getMachine().getFdaImagePath())
-                && FileUtils.fileValid(getMachine().getFdbImagePath())
-                && FileUtils.fileValid(getMachine().getSdImagePath())
-                && FileUtils.fileValid(getMachine().getCdImagePath())
-                && FileUtils.fileValid(getMachine().getKernel())
-                && FileUtils.fileValid(getMachine().getInitRd());
+        String[] paths = new String[]{
+                getMachine().getHdaImagePath(), getMachine().getHdbImagePath(),
+                getMachine().getHdcImagePath(), getMachine().getHddImagePath(),
+                getMachine().getFdaImagePath(), getMachine().getFdbImagePath(),
+                getMachine().getSdImagePath(), getMachine().getCdImagePath(),
+                getMachine().getKernel(), getMachine().getInitRd()};
+        boolean ok = true;
+        for (String p : paths) {
+            boolean v = FileUtils.fileValid(p);
+            Log.i("LimboDBG", "validate path=" + p + " valid=" + v);
+            ok = ok && v;
+        }
+        return ok;
     }
 
     private void onStopButton(boolean exitApp) {
@@ -1577,8 +1694,116 @@ public class LimboActivity extends AppCompatActivity
         }
     }
 
+    /**
+     * Special keys strip for the VNC display: the app itself has no on-screen
+     * guest, so the keys are injected into QEMU over QMP (the same input path
+     * a connected VNC viewer uses).  It has no keyboard to follow, so it is
+     * toggled from the menu while the VM is running.
+     */
+    private void setupSpecialKeysBar() {
+        specialKeysBar = SpecialKeysBar.attach(this, new SpecialKeysBar.Sender() {
+            @Override
+            public void send(final int[] keyCodes) {
+                sendKeysViaQmp(keyCodes);
+            }
+
+            @Override
+            public boolean setHeld(int keyCode, boolean down) {
+                /* QMP's sendkey is atomic (press+release), so modifiers can
+                 * only be borrowed for the next key. */
+                return false;
+            }
+        });
+    }
+
+    private void sendKeysViaQmp(final int[] keyCodes) {
+        final StringBuilder keys = new StringBuilder();
+        for (int code : keyCodes) {
+            String qcode = qcodeFor(code);
+            if (qcode == null) {
+                continue;
+            }
+            if (keys.length() > 0) {
+                keys.append(",");
+            }
+            keys.append("{\"type\":\"qcode\",\"data\":\"").append(qcode).append("\"}");
+        }
+        if (keys.length() == 0) {
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String response = QmpClient.sendCommand("{\"execute\":\"sendkey\",\"arguments\":{"
+                        + "\"keys\":[" + keys + "],\"hold-time\":100}}");
+                if (response == null || response.contains("\"error\"")) {
+                    Log.w(TAG, "sendkey failed: " + response);
+                }
+            }
+        }, "LimboSendKey").start();
+    }
+
+    /** Android key code -> QEMU QKeyCode name (as used by QMP sendkey). */
+    private static String qcodeFor(int keyCode) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_CTRL_LEFT:
+                return "ctrl";
+            case KeyEvent.KEYCODE_CTRL_RIGHT:
+                return "ctrl_r";
+            case KeyEvent.KEYCODE_ALT_LEFT:
+                return "alt";
+            case KeyEvent.KEYCODE_ALT_RIGHT:
+                return "alt_r";
+            case KeyEvent.KEYCODE_SHIFT_LEFT:
+                return "shift";
+            case KeyEvent.KEYCODE_SHIFT_RIGHT:
+                return "shift_r";
+            case KeyEvent.KEYCODE_META_LEFT:
+                return "meta_l";
+            case KeyEvent.KEYCODE_META_RIGHT:
+                return "meta_r";
+            case KeyEvent.KEYCODE_ESCAPE:
+                return "esc";
+            case KeyEvent.KEYCODE_TAB:
+                return "tab";
+            case KeyEvent.KEYCODE_ENTER:
+                return "ret";
+            case KeyEvent.KEYCODE_DEL:
+                return "backspace";
+            case KeyEvent.KEYCODE_FORWARD_DEL:
+                return "delete";
+            case KeyEvent.KEYCODE_INSERT:
+                return "insert";
+            case KeyEvent.KEYCODE_MOVE_HOME:
+                return "home";
+            case KeyEvent.KEYCODE_MOVE_END:
+                return "end";
+            case KeyEvent.KEYCODE_PAGE_UP:
+                return "pgup";
+            case KeyEvent.KEYCODE_PAGE_DOWN:
+                return "pgdn";
+            case KeyEvent.KEYCODE_DPAD_UP:
+                return "up";
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                return "down";
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                return "left";
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                return "right";
+            case KeyEvent.KEYCODE_SYSRQ:
+                return "sysrq";
+            default:
+                break;
+        }
+        if (keyCode >= KeyEvent.KEYCODE_F1 && keyCode <= KeyEvent.KEYCODE_F12) {
+            return "f" + (keyCode - KeyEvent.KEYCODE_F1 + 1);
+        }
+        return null;
+    }
+
     public void setupWidgets() {
         setupSections();
+        setupSpecialKeysBar();
         mScrollView = findViewById(R.id.scroll_view);
         mStatus = findViewById(R.id.statusVal);
         mStatus.setImageResource(R.drawable.off);
@@ -2221,7 +2446,8 @@ public class LimboActivity extends AppCompatActivity
 
         final Spinner size = new Spinner(this);
         LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (int) (56 * getResources().getDisplayMetrics().density));
 
         String[] arraySpinner = new String[5];
         arraySpinner[0] = "4GB (Growable)";
@@ -2234,6 +2460,48 @@ public class LimboActivity extends AppCompatActivity
         sizeAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
         size.setAdapter(sizeAdapter);
         mLayout.addView(size, spinnerParams);
+
+        final Spinner format = new Spinner(this);
+        String[] formats = {"qcow2", "raw", "vmdk", "vdi", "vhdx", "qed",
+                            "vpc", "parallels"};
+        ArrayAdapter<?> formatAdapter = new ArrayAdapter<Object>(this,
+                R.layout.custom_spinner_item, formats);
+        formatAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
+        format.setAdapter(formatAdapter);
+        mLayout.addView(format, spinnerParams);
+
+
+        final Spinner compression = new Spinner(this);
+        String[] compressions = {"无压缩", "zlib", "zstd"};
+        ArrayAdapter<?> compressionAdapter = new ArrayAdapter<Object>(this,
+                R.layout.custom_spinner_item, compressions);
+        compressionAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
+        compression.setAdapter(compressionAdapter);
+        mLayout.addView(compression, spinnerParams);
+
+        final Spinner prealloc = new Spinner(this);
+        String[] preallocs = {"不预分配", "仅元数据", "快速分配（falloc）", "完全分配（full）"};
+        ArrayAdapter<?> preallocAdapter = new ArrayAdapter<Object>(this,
+                R.layout.custom_spinner_item, preallocs);
+        preallocAdapter.setDropDownViewResource(R.layout.custom_spinner_dropdown_item);
+        prealloc.setAdapter(preallocAdapter);
+        mLayout.addView(prealloc, spinnerParams);
+
+        format.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view,
+                                       int position, long id) {
+                String fmt = String.valueOf(format.getSelectedItem());
+                boolean qcow2 = "qcow2".equals(fmt);
+                boolean raw = "raw".equals(fmt);
+                compression.setVisibility(qcow2 ? View.VISIBLE : View.GONE);
+                prealloc.setVisibility(qcow2 || raw ? View.VISIBLE : View.GONE);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
 
         alertDialog.setView(mLayout);
 
@@ -2253,32 +2521,65 @@ public class LimboActivity extends AppCompatActivity
                 }
 
                 int sizeSel = size.getSelectedItemPosition();
-                String templateImage = "hd4g.qcow2";
-                if (sizeSel == 0) {
-                    templateImage = "hd4g.qcow2";
-                } else if (sizeSel == 1) {
-                    templateImage = "hd16g.qcow2";
-                } else if (sizeSel == 2) {
-                    templateImage = "hd32g.qcow2";
-                } else if (sizeSel == 3) {
-                    templateImage = "hd64g.qcow2";
-                } else if (sizeSel == 4) {
-                    templateImage = "hd128g.qcow2";
-                }
+                long[] sizes = {4L << 30, 16L << 30, 32L << 30,
+                                64L << 30, 128L << 30};
+                String templateImage = sizeSel == 0 ? "hd4g.qcow2"
+                        : sizeSel == 1 ? "hd16g.qcow2"
+                        : sizeSel == 2 ? "hd32g.qcow2"
+                        : sizeSel == 3 ? "hd64g.qcow2" : "hd128g.qcow2";
 
                 String image = imageNameView.getText().toString();
-                if (image.trim().equals(""))
+                if (image.trim().equals("")) {
                     ToastUtils.toastShort(activity, getString(R.string.ImageFilenameCannotBeEmpty));
-                else {
-                    if (!image.endsWith(".qcow2")) {
-                        image += ".qcow2";
-                    }
-                    String filePath = FileUtils.createImgFromTemplate(LimboActivity.this, templateImage, image, fileType);
-                    if (filePath!=null) {
+                    return;
+                }
+
+                String fmt = (String) format.getSelectedItem();
+                // LIMBO: .img is the conventional extension for raw images.
+                String ext = fmt.equals("qcow2") ? ".qcow2"
+                        : fmt.equals("raw") ? ".img" : "." + fmt;
+                if (!image.endsWith(ext)) {
+                    image += ext;
+                }
+
+                String imagesDir = LimboSettingsManager.getImagesDir(LimboActivity.this);
+                if (imagesDir.startsWith("content://")) {
+                    // SAF directories have no path QEMU can write to; keep the
+                    // legacy template copy for now.
+                    String filePath = FileUtils.createImgFromTemplate(LimboActivity.this,
+                            templateImage, image, fileType);
+                    if (filePath != null) {
                         updateDrive(fileType, filePath);
                         alertDialog.dismiss();
                     }
+                    return;
+                }
 
+                String filePath = imagesDir + "/" + image;
+                String comp = (String) compression.getSelectedItem();
+                StringBuilder optsBuilder = new StringBuilder();
+                if (fmt.equals("qcow2") && !comp.equals("无压缩")) {
+                    optsBuilder.append("compression_type=").append(comp);
+                }
+                if (fmt.equals("qcow2") || fmt.equals("raw")) {
+                    if (optsBuilder.length() > 0) {
+                        optsBuilder.append(",");
+                    }
+                    String[] preallocVals = {"off", "metadata",
+                            "falloc", "full"};
+                    optsBuilder.append("preallocation=")
+                            .append(preallocVals[prealloc.getSelectedItemPosition()]);
+                }
+                String opts = optsBuilder.toString();
+                String err = VMExecutor.nativeCreateImage(filePath, fmt,
+                        sizes[sizeSel], opts);
+                if (err == null) {
+                    ToastUtils.toastShort(activity,
+                            getString(R.string.ImageCreated) + ": " + filePath);
+                    updateDrive(fileType, filePath);
+                    alertDialog.dismiss();
+                } else {
+                    ToastUtils.toastLong(activity, err);
                 }
             }
         });
@@ -2661,6 +2962,10 @@ public class LimboActivity extends AppCompatActivity
             menu.add(0, IMPORT, 0, R.string.ImportMachines).setIcon(R.drawable.importvms);
         }
         menu.add(0, IMPORT_BIOS_FILE, 0, R.string.ImportBIOSFile).setIcon(R.drawable.importvms);
+        if (MachineController.getInstance().isRunning()) {
+            menu.add(0, SPECIAL_KEYS, 0, R.string.special_keys_bar)
+                    .setIcon(R.drawable.keyboard);
+        }
         menu.add(0, SETTINGS, 0, R.string.Settings).setIcon(R.drawable.settings);
         menu.add(0, VIEWLOG, 0, R.string.ViewLog).setIcon(android.R.drawable.ic_menu_view);
         menu.add(0, HELP, 0, R.string.help).setIcon(R.drawable.help);
@@ -2704,6 +3009,12 @@ public class LimboActivity extends AppCompatActivity
             LimboActivityCommon.showChangelog(LimboActivity.this);
         } else if (item.getItemId() == LICENSE) {
             promptLicense();
+        } else if (item.getItemId() == SPECIAL_KEYS) {
+            if (specialKeysBar != null) {
+                specialKeysBar.setSuppressed(false);
+                specialKeysBar.setVisible(!specialKeysBar.isVisible());
+                invalidateOptionsMenu();
+            }
         } else if (item.getItemId() == QUIT) {
             exit();
         }
@@ -2750,6 +3061,9 @@ public class LimboActivity extends AppCompatActivity
     }
 
     public void onPause() {
+        if (screenSaver != null) {
+            screenSaver.end();
+        }
         View currentView = getCurrentFocus();
         if (currentView instanceof EditText) {
             currentView.setFocusable(false);
@@ -2759,6 +3073,9 @@ public class LimboActivity extends AppCompatActivity
 
     public void onResume() {
         super.onResume();
+        if (screenSaver != null) {
+            screenSaver.begin();
+        }
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {

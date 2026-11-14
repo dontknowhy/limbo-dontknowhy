@@ -24,6 +24,8 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import android.system.Os;
+import android.system.OsConstants;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 
@@ -41,6 +43,7 @@ import com.max2idea.android.limbo.toast.ToastUtils;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -110,14 +113,214 @@ public class FileUtils {
      * @param filePath
      * @return
      */
+    /* Keep SAF file descriptors open for the lifetime of the process: QEMU
+     * dups them via the fdset protocol, and closing the ParcelFileDescriptor
+     * early would invalidate the descriptor. */
+    private static final java.util.ArrayList<ParcelFileDescriptor> safFds =
+            new java.util.ArrayList<>();
+
+    /* "-add-fd fd=N,set=S" argument pairs collected while the QEMU command
+     * line is being built. Reset by VMExecutor before each start. */
+    private static final java.util.ArrayList<String> safFdArgs =
+            new java.util.ArrayList<>();
+    private static int safFdSetCount = 0;
+
+    /** Forget (and close) the fd sets of the previous VM start. */
+    public static synchronized void resetSafFdArgs() {
+        safFdArgs.clear();
+        safFdSetCount = 0;
+        for (ParcelFileDescriptor pfd : safFds) {
+            try {
+                pfd.close();
+            } catch (Exception ignored) {
+            }
+        }
+        safFds.clear();
+    }
+
+    /** The -add-fd pairs collected since resetSafFdArgs(). */
+    public static synchronized java.util.ArrayList<String> getSafFdArgs() {
+        return new java.util.ArrayList<>(safFdArgs);
+    }
+
+    private static synchronized void registerSafFd(int set, int fd) {
+        safFdArgs.add("-add-fd");
+        safFdArgs.add("fd=" + fd + ",set=" + set);
+    }
+
+    private static ParcelFileDescriptor tryOpenFd(Uri uri, String mode) {
+        try {
+            ParcelFileDescriptor pfd = LimboApplication.getInstance().getContentResolver()
+                    .openFileDescriptor(uri, mode);
+            /* QEMU refuses an fd with FD_CLOEXEC ("fd is not valid or already
+             * in use"); bionic sets it on every descriptor. We hand the
+             * number over in-process, so clearing it is safe. */
+            try {
+                FileDescriptor fd = pfd.getFileDescriptor();
+                int flags = Os.fcntlInt(fd, OsConstants.F_GETFD, 0);
+                if ((flags & OsConstants.FD_CLOEXEC) != 0) {
+                    Os.fcntlInt(fd, OsConstants.F_SETFD,
+                            flags & ~OsConstants.FD_CLOEXEC);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Could not clear FD_CLOEXEC on " + uri + ": " + e);
+            }
+            return pfd;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Turn a SAF content:// URI into something QEMU can open.
+     *
+     * We cannot hand QEMU /proc/self/fd/<n>: that magic link resolves back to
+     * /storage/emulated/... and scoped storage answers EACCES for a path the
+     * app was never granted (this is what produced
+     * "Could not open '/proc/self/fd/190': Permission denied").
+     *
+     * QEMU's fdset protocol dups the descriptor we already hold instead, so
+     * the URI becomes "/dev/fdset/<set>" and the numbers travel on the command
+     * line as "-add-fd fd=<n>,set=<set>". A set gets both an O_RDWR and an
+     * O_RDONLY descriptor because monitor_fdset_dup_fd_add() only matches an
+     * exact access mode (a CDROM is opened read-only, a disk read-write).
+     */
     public static String encodeDocumentFilePath(String filePath) {
         if (filePath != null && filePath.startsWith("content://")) {
-            filePath = filePath.replace("content://", "/content//");
-            filePath = filePath.replaceAll("%", "\\^\\^\\^");
-            ;
-
+            Uri uri = Uri.parse(filePath);
+            ParcelFileDescriptor rw = tryOpenFd(uri, "rw");
+            ParcelFileDescriptor ro = tryOpenFd(uri, "r");
+            if (rw != null || ro != null) {
+                int set = safFdSetCount++;
+                if (rw != null) {
+                    safFds.add(rw);
+                    registerSafFd(set, rw.getFd());
+                }
+                if (ro != null) {
+                    safFds.add(ro);
+                    registerSafFd(set, ro.getFd());
+                }
+                Log.d(TAG, "SAF " + uri + " -> /dev/fdset/" + set
+                        + (rw != null ? " [rw]" : "") + (ro != null ? " [ro]" : ""));
+                return "/dev/fdset/" + set;
+            }
+            if (Config.debug) {
+                Log.e(TAG, "Could not open a descriptor for " + uri);
+            }
         }
         return filePath;
+    }
+
+    /**
+     * Path for -kernel / -initrd.
+     *
+     * These two are the only files QEMU still opens by path with plain
+     * fopen()/g_mapped_file_new() (hw/i386/x86-common.c) and glib's mmap
+     * helper, none of which know about /dev/fdset. Copying the small,
+     * read-once boot files into the app cache is cheaper than teaching every
+     * loader a new trick, and it works for bzImage, ELF and uImage alike.
+     */
+    public static String encodeBootFilePath(String filePath, String tag) {
+        if (filePath == null || !filePath.startsWith("content://")) {
+            return filePath;
+        }
+
+        Uri uri = Uri.parse(filePath);
+        File dir = new File(LimboApplication.getInstance().getCacheDir(), "limbo");
+        File out = new File(dir, "saf-" + tag + "-"
+                + Integer.toHexString(filePath.hashCode()) + ".bin");
+        try {
+            if (!dir.exists() && !dir.mkdirs()) {
+                throw new java.io.IOException("cannot create " + dir);
+            }
+            ParcelFileDescriptor pfd = LimboApplication.getInstance()
+                    .getContentResolver().openFileDescriptor(uri, "r");
+            if (pfd == null) {
+                return filePath;
+            }
+            long expected = -1;
+            try {
+                expected = Os.fstat(pfd.getFileDescriptor()).st_size;
+            } catch (Exception ignored) {
+            }
+            if (out.exists() && expected >= 0 && out.length() == expected) {
+                pfd.close();
+                return out.getAbsolutePath();
+            }
+            try (java.io.InputStream in =
+                         new ParcelFileDescriptor.AutoCloseInputStream(pfd);
+                 java.io.FileOutputStream fos =
+                         new java.io.FileOutputStream(out)) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    fos.write(buf, 0, n);
+                }
+            }
+            Log.d(TAG, "SAF " + uri + " -> " + out + " (" + out.length() + " B)");
+            return out.getAbsolutePath();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not cache " + uri + ": " + e);
+            return filePath;
+        }
+    }
+
+    /* Hotplug sets start above the command-line ones (VMExecutor numbers
+     * those from 0) so a runtime change cannot collide with a start-up set. */
+    private static final int HOTPLUG_FDSET_BASE = 100;
+    private static int hotplugFdSetCount = 0;
+
+    /**
+     * Registers the descriptor of a running VM's new medium. Implemented in
+     * libcompat-limbo.so: QEMU is dlopen()ed in this process, so it can call
+     * limbo_fdset_add() directly instead of going through QMP add-fd (which
+     * would need SCM_RIGHTS over the monitor socket).
+     *
+     * @return 0 on success, -1 if the descriptor could not be added
+     */
+    private static native int nativeAddFd(String qemuLibrary, int fd, int fdsetId);
+
+    /**
+     * Same as encodeDocumentFilePath(), but for a VM that is already running:
+     * the fd set has to be registered in-process because "-add-fd" is a
+     * command-line-only option. Falls back to /proc/self/fd (works for
+     * app-private files only) when registration fails.
+     */
+    public static String encodeDocumentFilePathForHotplug(String filePath,
+                                                          String qemuLibrary) {
+        if (filePath == null || !filePath.startsWith("content://")) {
+            return filePath;
+        }
+
+        Uri uri = Uri.parse(filePath);
+        ParcelFileDescriptor rw = tryOpenFd(uri, "rw");
+        ParcelFileDescriptor ro = tryOpenFd(uri, "r");
+        if (rw == null && ro == null) {
+            return filePath;
+        }
+
+        int set = HOTPLUG_FDSET_BASE + hotplugFdSetCount;
+        boolean registered = false;
+        if (rw != null) {
+            safFds.add(rw);
+            registered |= nativeAddFd(qemuLibrary, rw.getFd(), set) == 0;
+        }
+        if (ro != null) {
+            safFds.add(ro);
+            registered |= nativeAddFd(qemuLibrary, ro.getFd(), set) == 0;
+        }
+
+        if (registered) {
+            hotplugFdSetCount++;
+            return "/dev/fdset/" + set;
+        }
+
+        /* Nothing was registered; the media change will fail unless the path
+         * happens to be directly accessible. */
+        int fd = rw != null ? rw.getFd() : ro.getFd();
+        Log.e(TAG, "Could not register " + uri + ", falling back to /proc/self/fd/"
+                + fd);
+        return "/proc/self/fd/" + fd;
     }
 
     public static void saveFileContents(String filePath, String contents) {
@@ -184,6 +387,10 @@ public class FileUtils {
     public static boolean fileValid(String path) {
         if (path == null || path.equals(""))
             return true;
+        if (path.startsWith("/dev/fdset/")) {
+            /* A descriptor handed to QEMU with -add-fd; it has no path. */
+            return true;
+        }
         if (path.startsWith("content://") || path.startsWith("/content/")) {
             int fd = get_fd(path);
             if (fd <= 0)
@@ -538,9 +745,12 @@ public class FileUtils {
             return null;
 
         Uri uri = data.getData();
-        DocumentFile pickedFile = DocumentFile.fromSingleUri(activity, uri);
         String file = uri.toString();
-        if (!file.contains("com.android.externalstorage.documents")) {
+        /* LIMBO: used to require the AOSP "externalstorage" provider, a
+         * leftover from the era when the native compat layer parsed the URI
+         * itself. Access now goes through a file descriptor (/dev/fdset), so
+         * any provider is fine - MIUI's file explorer, MediaStore, Drive. */
+        if (!file.startsWith("content://")) {
             showFileNotSupported(activity);
             return null;
         }

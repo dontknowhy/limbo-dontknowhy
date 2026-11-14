@@ -30,6 +30,34 @@ import com.max2idea.android.limbo.dontknowhy.LimboActivity;
 public class KeyboardUtils {
     private static final String TAG = "KeyboardUtils";
 
+    /** Told whenever this class shows or hides the soft keyboard. */
+    public interface OnKeyboardVisibilityListener {
+        void onKeyboardVisibility(boolean visible);
+    }
+
+    private static OnKeyboardVisibilityListener listener;
+    private static boolean keyboardVisible;
+
+    public static void setOnKeyboardVisibilityListener(OnKeyboardVisibilityListener l) {
+        listener = l;
+    }
+
+    /**
+     * Whether the soft keyboard was last shown through this class.  IME insets
+     * are not delivered to apps targeting a legacy SDK, so this is the only
+     * dependable signal here.
+     */
+    public static boolean isKeyboardVisible() {
+        return keyboardVisible;
+    }
+
+    private static void notifyVisibility(boolean visible) {
+        keyboardVisible = visible;
+        if (listener != null) {
+            listener.onKeyboardVisibility(visible);
+        }
+    }
+
     public static boolean showKeyboard(Activity activity, boolean toggle, View view) {
         // Prevent crashes from activating mouse when machine is paused
         if ( MachineController.getInstance().isPaused())
@@ -41,10 +69,12 @@ public class KeyboardUtils {
                 view.requestFocus();
                 inputMgr.showSoftInput(view, InputMethodManager.SHOW_FORCED);
             }
+            notifyVisibility(true);
         } else {
             if (view != null) {
                 inputMgr.hideSoftInputFromWindow(view.getWindowToken(), 0);
             }
+            notifyVisibility(false);
         }
         return !toggle;
     }
@@ -54,5 +84,6 @@ public class KeyboardUtils {
         if (view != null) {
             inputMgr.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
+        notifyVisibility(false);
     }
 }

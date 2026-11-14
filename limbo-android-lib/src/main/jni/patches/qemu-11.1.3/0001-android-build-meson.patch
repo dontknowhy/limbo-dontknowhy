@@ -1,0 +1,67 @@
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -1372,7 +1372,9 @@
+ if host_os != 'windows'
+   have_shm_open = cc.has_function('shm_open')
+   if not have_shm_open
+-    rt = cc.find_library('rt', required: true)
++    # Android/bionic has no separate librt; shm_open is provided by
++    # util/oslib-posix.c (Termux patch).
++    rt = cc.find_library('rt', required: false)
+   endif
+ endif
+ 
+@@ -1940,7 +1942,9 @@
+   endif
+ endif
+ 
+-x11 = dependency('x11', method: 'pkg-config', required: gtkx11.found())
++# LIMBO: never look for X11; the Android build has no Xlib and SDL is used
++# without the X11 keymap helper.
++x11 = not_found
+ 
+ png = not_found
+ if get_option('png').allowed() and have_system
+@@ -2895,9 +2899,6 @@
+     CPU_FREE(cpuset);
+     return 0;
+   }''', dependencies: threads))
+-config_host_data.set('CONFIG_SIGNALFD', cc.links(osdep_prefix + '''
+-  #include <sys/signalfd.h>
+-  int main(void) { return signalfd(-1, NULL, SFD_CLOEXEC); }'''))
+ 
+ config_host_data.set('HAVE_MLOCKALL', cc.links(osdep_prefix + '''
+   #include <sys/mman.h>
+@@ -3256,7 +3257,7 @@
+   'loongarch' : ['CONFIG_LOONGARCH_DIS'],
+ }
+ 
+-have_ivshmem = config_host_data.get('CONFIG_EVENTFD')
++have_ivshmem = false
+ host_kconfig = \
+   (get_option('fuzzing') ? ['CONFIG_FUZZ=y'] : []) + \
+   (have_tpm ? ['CONFIG_TPM=y'] : []) + \
+diff --git a/util/meson.build b/util/meson.build
+--- a/util/meson.build
++++ b/util/meson.build
+@@ -1,4 +1,6 @@
+ util_ss.add(files('osdep.c', 'cutils.c', 'unicode.c', 'qemu-timer-common.c'))
++# Android API 21 has no openpty(); provide it ourselves.
++util_ss.add(files('limbo-openpty.c'))
+ util_ss.add(files('thread-context.c'), numa)
+ if host_os != 'windows'
+   util_ss.add(files('aio-posix.c'))
+diff --git a/system/main.c b/system/main.c
+--- a/system/main.c
++++ b/system/main.c
+@@ -22,6 +22,9 @@
+  * THE SOFTWARE.
+  */
+ 
++/* Android SDL renames main() to SDL_main unless this is defined. */
++#define SDL_MAIN_HANDLED 1
++
+ #include "qemu/osdep.h"
+ #include "qemu-main.h"
+ #include "qemu/main-loop.h"

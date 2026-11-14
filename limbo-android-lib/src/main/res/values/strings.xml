@@ -234,8 +234,11 @@
     <string name="EnableQMPForChangingDrives">Enable QMP in settings to change removable drives</string>
     <string name="SetVNCPassword">Set VNC Password</string>
     <string name="EnableVNCPassword">Enable VNC Password (recommended)</string>
-    <string name="ImmersiveMode">Immersive Mode</string>
-    <string name="EnableImmersiveMode">Enable Immersive Mode</string>
+    <string name="ScreenSaver">Screen Saver</string>
+    <string name="ScreenSaverTimeout">Idle timeout (seconds)</string>
+    <string name="RestartingForQemu">QEMU already ran in this app session, please reopen Limbo</string>
+    <string name="ScreenSaverEntered">Screen saver on, tap the screen to wake</string>
+    <string name="ScreenSaverTimeoutSummary">Hide the UI after this many seconds without input; 0 disables it. VNC shows a bouncing DVD logo.</string>
     <string name="UsingKeyMapper">Using Key Mapper</string>
     <string name="PreventMouseOutOfBounds">Prevent Mouse out of Bounds</string>
     <string name="PreventMouseDescr">Prevents some OSes from crashing when using \"usb-tablet\" mouse and the pointer is outside of screen bounds.\nWarning: This might create an invisible wall if the guest OS does not support \"usb-tablet\".</string>
@@ -262,9 +265,10 @@
     <string name="DisableHPET">Fake Battery</string>
     <string name="DisableTSC">Enable l3 cache</string>
     <string name="DisableACPI">Enable UEFI(32)</string>
-    <string name="BackgroundString">Use Linus selfile as background</string>
-    <string name="BackgroundSummary">Use the famous Linus selfie as the application\'s background</string>
+    <string name="BackgroundString">Use the Genshin background</string>
+    <string name="BackgroundSummary">Use the Genshin background image</string>
     <string name="audio_preference">Audio</string>
     <string name="keymaper_tip">You can select a key and click the Keyboard icon to make a key combination</string>
     <string name="bios_installed_msg">BIOS and Keymap files installed</string>
+    <string name="special_keys_bar">Special keys</string>
 </resources>

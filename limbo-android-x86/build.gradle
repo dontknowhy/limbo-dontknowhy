@@ -7,7 +7,7 @@ android {
         applicationId "com.limbo.emu.dontknowhy"
         minSdk 24
         targetSdkVersion 29
-        ndk { abiFilters "armeabi-v7a","arm64-v8a", "x86", "x86_64" }
+        ndk { abiFilters "arm64-v8a" }
     }
     buildTypes {
         release {
@@ -25,6 +25,16 @@ android {
         }
     }
     namespace 'com.limbo.emu.dontknowhy'
+
+    // Native libraries are stored uncompressed and are 16 KB page aligned by
+    // scripts/package-apk.sh (zipalign -P 16) before signing, so Android 15+
+    // does not warn about misaligned .so files.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
     lint {
         abortOnError false
         disable 'MissingTranslation'

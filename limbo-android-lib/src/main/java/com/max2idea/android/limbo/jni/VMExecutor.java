@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.Build;
 import android.util.Log;
 import android.view.Gravity;
 
@@ -50,7 +51,7 @@ import java.util.Arrays;
  * Class is used to start and stop the qemu process and communicate file descriptions, mouse,
  * and keyboard events.
  */
-class VMExecutor extends MachineExecutor {
+public class VMExecutor extends MachineExecutor {
     private static final String TAG = "VMExecutor";
 
     private static final String cdDeviceName = "ide1-cd0";
@@ -107,15 +108,18 @@ class VMExecutor extends MachineExecutor {
 
     public native void nativeEnableAaudio(int value, String aaudioLibName, String aaudioLibPath);
 
+    public static native String nativeCreateImage(String path, String fmt,
+                                                  long size, String options);
+
     /**
      * Prints parameters in qemu format
      *
      * @param params Parameters to be printed
      */
     public void printParams(String[] params) {
-        Log.d(TAG, "Params:");
+        Log.wtf(TAG, "Params:");
         for (int i = 0; i < params.length; i++) {
-            Log.d(TAG, i + ": " + params[i]);
+            Log.wtf(TAG, i + ": " + params[i]);
         }
     }
 
@@ -157,6 +161,9 @@ private String getQemuLibrary() {
 
     private String[] prepareParams(Context context) throws Exception {
         ArrayList<String> paramsList = new ArrayList<>();
+        /* SAF files are handed to QEMU as /dev/fdset/<set>; the matching
+         * -add-fd options are collected while the paths are encoded below. */
+        FileUtils.resetSafFdArgs();
         paramsList.add(getQemuLibrary());
         addUIOptions(context, paramsList);
         addCpuBoardOptions(paramsList);
@@ -165,11 +172,12 @@ private String getQemuLibrary() {
         addBootOptions(paramsList);
         addGraphicsOptions(paramsList);
         addAudioOptions(paramsList);
-        addNetworkOptions(paramsList);
+        addNetworkOptions(context, paramsList);
         addGenericOptions(context, paramsList);
         addStateOptions(paramsList);
         addAdvancedOptions(paramsList);
         addAccelerationOptions(paramsList);
+        paramsList.addAll(FileUtils.getSafFdArgs());
         return paramsList.toArray(new String[0]);
     }
 
@@ -233,7 +241,7 @@ private String getQemuLibrary() {
 
         if (getMachine().getMouse() != null && !getMachine().getMouse().equals("ps2")) {
             paramsList.add("-device");
-            paramsList.add("usb-ehci,id=ehci,maxframes=256,x-pcie-extcap-init=true,x-pcie-lnksta-dllla=true,multifunction=on");
+            paramsList.add("usb-ehci,id=ehci,maxframes=256,multifunction=on");
             paramsList.add("-device");
             paramsList.add(getMachine().getMouse());
         }
@@ -248,17 +256,46 @@ private String getQemuLibrary() {
     }
 
     private void addAudioOptions(ArrayList<String> paramsList) {
-        if (getSoundCard() != null) {
-            paramsList.add("-soundhw");
-            paramsList.add(getSoundCard());
-            paramsList.add("-global");
-            paramsList.add("intel-hda.msi=auto");
-            paramsList.add("-global");
-            paramsList.add("hda-duplex.use-timer=true");
-            paramsList.add("-global");
-            paramsList.add("hda-duplex.cad=4294967295");
-            paramsList.add("-global");
-            paramsList.add("hda-duplex.mixer=true");
+        String card = getSoundCard();
+        if (card == null) {
+            return;
+        }
+        // LIMBO: QEMU >= 7 removed -soundhw; instantiate the device directly.
+        String cardId = card.toLowerCase();
+        switch (cardId) {
+            case "hda":
+                paramsList.add("-device");
+                paramsList.add("intel-hda");
+                paramsList.add("-device");
+                paramsList.add("hda-duplex,audiodev=sdl");
+                paramsList.add("-global");
+                paramsList.add("intel-hda.msi=auto");
+                /* LIMBO: QEMU 11 removed the hda-duplex 'use-timer' and 'cad'
+                 * properties (the codec address now comes from the bus), so
+                 * passing them as -global makes the device fail to create. */
+                paramsList.add("-global");
+                paramsList.add("hda-duplex.mixer=true");
+                break;
+            case "ac97":
+                paramsList.add("-device");
+                paramsList.add("AC97,audiodev=sdl");
+                break;
+            case "cs4231a":
+                paramsList.add("-device");
+                paramsList.add("CS4231A,audiodev=sdl");
+                break;
+            case "es1370":
+                paramsList.add("-device");
+                paramsList.add("ES1370,audiodev=sdl");
+                break;
+            case "sb16":
+                paramsList.add("-device");
+                paramsList.add("sb16,audiodev=sdl");
+                break;
+            default:
+                paramsList.add("-device");
+                paramsList.add(card + ",audiodev=sdl");
+                break;
         }
     }
 
@@ -307,20 +344,42 @@ private String getQemuLibrary() {
         }
 
         paramsList.add("-no-fd-bootchk");
-        paramsList.add("-no-hpet");
         paramsList.add("-nodefaults");
-        paramsList.add("-readconfig");
-        paramsList.add("limbo.cfg");
         paramsList.add("-global");
         paramsList.add("VGA.romfile=vgabios-xbzj.bin"); /*防止VGA的BIOS出现问题*/
         paramsList.add("-audiodev");
-        paramsList.add("sdl,id=sdl,in.channels=2,in.frequency=44100,out.buffer-length=12000,in.format=s16,in.voices=2");
+        // LIMBO: always use the native Android backends (audio/openslesaudio.c
+        // and audio/aaudioaudio.c) for both directions.  SDL2's Android audio
+        // driver can only play, and it needs the SDL video subsystem, which
+        // does not exist under VNC.  AAudio is API 26+; fall back to OpenSL ES
+        // on older devices.
+        boolean useAaudio = Build.VERSION.SDK_INT >= 26
+                && LimboSettingsManager.getEnableAaudio(context);
+        paramsList.add((useAaudio ? "aaudio" : "opensles")
+                + ",id=sdl,out.buffer-length=12000");
         if (!Config.enableDefaultDevices)
             paramsList.add("-nodefaults");
     }
 
-    private void addCpuBoardOptions(ArrayList<String> paramsList) {
+    private boolean isBothUefiRequested() {
+        return getMachine().getDisableAcpi() != 0 && getMachine().getEnableKVM() != 0;
+    }
 
+    private boolean useUefi64() {
+        if (isBothUefiRequested()) {
+            return LimboApplication.arch != Config.Arch.x86;
+        }
+        return getMachine().getEnableKVM() != 0;
+    }
+
+    private boolean useUefi32() {
+        if (isBothUefiRequested()) {
+            return LimboApplication.arch == Config.Arch.x86;
+        }
+        return getMachine().getDisableAcpi() != 0;
+    }
+
+    private void addCpuBoardOptions(ArrayList<String> paramsList) {
         //XXX: SMP is not working correctly for some guest OSes
         //so we enable multi core only under KVM
         // anyway regular emulation is not gaining any benefit unless mttcg is enabled but that
@@ -331,7 +390,7 @@ private String getQemuLibrary() {
         }
         if (getMachineType() != null && !getMachineType().equals("默认")) {
             paramsList.add("-M");
-            paramsList.add(getMachineType() + ",vmport=off,kernel-irqchip=off,dump-guest-core=off,mem-merge=off,hmat=off");
+            paramsList.add(getMachineType() + ",vmport=off,kernel-irqchip=off,dump-guest-core=off,mem-merge=off,hmat=off,hpet=off");
         }
 
         //FIXME: something is wrong with quoting that doesn't let sparc qemu find the cpu def
@@ -349,19 +408,27 @@ private String getQemuLibrary() {
                 else if (LimboApplication.arch == Config.Arch.x86_64)
                     cpu = "qemu64";
             }
-            cpu += ",l3-cache=true,cid=off,cldemote=off,clzero=off,cmp-legacy=off,cmp_legacy=off,core-capability=off,amd-no-ssb=off,amd-ssbd=off,amd-stibp=off,ace2-en=off,ace2=off,adx=on,topoext=off,osvw=off,misalignsse=off,fxsr-opt=off,rdpid=off,umip=off,xsaves=off,sha-ni=off,lm=on,syscall=on,aes=off,vaes=off,ss=on,sse=on,sse2=on,sse4.1=on,sse4.2=off,sse4a=off,ssse3=off,gfni=off,fpu=on,vpclmulqdq=off,vmx=off,hypervisor=off,fsrm=off,decodeassists=off,ds-cpl=off,ds_cpl=off,dtes64=off,enforce=off,erms=off,est=off,extapic=off,f16c=off,perfctr-core=off,xsaveerptr=off,wbnoinvd=off,amd-stibp=off,ibpb=off,nrip-save=off,svm=off,acpi=on,lmce=on,fma=off,ht=on,abm=on,check=off,vme=off,full-cpuid-auto-level=on,fill-mtrr-mask=on,mmx=on,fma4=off,fma=off,vmware-cpuid-freq=false,host-phys-bits=false,mds-no=off,pcid=off,x2apic=off,tsc-deadline=off,invpcid=off,rdseed=off,spec-ctrl=off,arch-capabilities=off,ssbd=off,3dnowprefetch=off,3dnowext=off,xsavec=off,rdctl-no=off,ibrs-all=off,skip-l1dfl-vmentry=off,tcg-cpuid=off";
         }
 
-        if (getMachine().getDisableAcpi() != 0) {
+        // LIMBO: i440fx provides only two flash slots.  Enabling both the 32-bit
+        // and the 64-bit UEFI firmware used to emit two -pflash drives; the
+        // guest then executed garbage (stuck in 16-bit real mode) while QEMU
+        // created ~66k mappings and died with "mprotect failed on atexit array".
+        // Keep a single firmware image, chosen by the guest architecture.
+        if (isBothUefiRequested()) {
+            Log.w(TAG, "Both 32-bit and 64-bit UEFI requested; using only the "
+                    + (useUefi64() ? "64-bit" : "32-bit") + " firmware");
+        }
+        if (useUefi32()) {
             paramsList.add("-pflash");
-            paramsList.add("edk2-i386-code.fd");
+            paramsList.add(LimboApplication.getBasefileDir() + "/edk2-i386-code.fd");
         }
         if (getMachine().getDisableHPET() != 0) {
             paramsList.add("-acpitable");
-            paramsList.add("file=battery.dat");
+            paramsList.add("file=" + LimboApplication.getBasefileDir() + "/battery.dat");
         }
 
-        if (getMachine().getDisableAcpi() == 0 && getMachine().getEnableKVM() == 0) {
+        if (!useUefi32() && !useUefi64()) {
             paramsList.add("-bios");
             paramsList.add("bios-xbzj.bin");
         }
@@ -381,9 +448,9 @@ private String getQemuLibrary() {
         // XXX: we add the acceleration options after the extra params
         // this is due to QEMU applying the first instance of this option
         // so the extra params cannot override it.
-        if (getMachine().getEnableKVM() != 0) {
+        if (useUefi64()) {
             paramsList.add("-pflash");
-            paramsList.add("edk2-x86_64-code.fd");
+            paramsList.add(LimboApplication.getBasefileDir() + "/edk2-x86_64-code.fd");
         }
             paramsList.add("-accel");
             String tcgParams = "tcg";
@@ -410,7 +477,7 @@ private String getQemuLibrary() {
         return machineType;
     }
 
-    private void addNetworkOptions(ArrayList<String> paramsList) throws Exception {
+    private void addNetworkOptions(Context context, ArrayList<String> paramsList) throws Exception {
 
         String network = getNetCfg();
         if (network != null) {
@@ -418,6 +485,13 @@ private String getQemuLibrary() {
             if (network.equals("user")) {
                 String netParams = network;
                 netParams+= ",ipv4=on,ipv6=off";
+                /* LIMBO: slirp's built-in DNS server forwards to the host
+                 * resolver; Android has no /etc/resolv.conf, so hand it the
+                 * server from Settings or guest lookups time out. */
+                String dnsServer = LimboSettingsManager.getDNSServer(context);
+                if (dnsServer != null && !dnsServer.isEmpty()) {
+                    netParams += ",dns=" + dnsServer;
+                }
                 String hostFwd = getHostFwd();
                 if (hostFwd != null) {
 
@@ -553,11 +627,11 @@ private String getQemuLibrary() {
     }
 
     private String getInitRd() {
-        return FileUtils.encodeDocumentFilePath(getMachine().getInitRd());
+        return FileUtils.encodeBootFilePath(getMachine().getInitRd(), "initrd");
     }
 
     private String getKernel() {
-        return FileUtils.encodeDocumentFilePath(getMachine().getKernel());
+        return FileUtils.encodeBootFilePath(getMachine().getKernel(), "kernel");
     }
 
     public String getDriveFilePath(String driveFilePath) {
@@ -759,8 +833,27 @@ private String getQemuLibrary() {
      *
      * @return String from the native code vm-executor-jni.cpp
      */
+    private static boolean qemuInitializedOnce;
+
+    /**
+     * True once this process has called qemu_init(). QEMU cannot do that
+     * twice, so the UI restarts the process before a second VM start.
+     */
+    public static boolean isQemuInitialized() {
+        return qemuInitializedOnce;
+    }
+
     public String start() {
         String res = null;
+        if (qemuInitializedOnce) {
+            // QEMU keeps a lot of process-global state (drive_config_groups,
+            // QemuOpts lists, chardevs, ...), so qemu_init() cannot safely be
+            // called a second time in the same process.  Refuse instead of
+            // letting QEMU abort and take the whole app down.
+            ToastUtils.toastLong(LimboApplication.getInstance(),
+                    "QEMU 无法在同一进程内二次初始化。请完全退出 Limbo（从最近任务划掉）后重新打开，再启动虚拟机。");
+            return null;
+        }
         try {
             String[] params = prepareParams(LimboApplication.getInstance());
             printParams(params);
@@ -779,6 +872,7 @@ private String getQemuLibrary() {
             res = start(Config.storagedir, LimboApplication.getBasefileDir(),
                     libFilename, FileUtils.getNativeLibDir(LimboApplication.getInstance()) + "/" + libFilename,
                     Config.SDLHintScale, params);
+            qemuInitializedOnce = true;
         } catch (Exception ex) {
             ToastUtils.toastLong(LimboApplication.getInstance(), ex.getMessage());
             return res;
@@ -966,7 +1060,8 @@ private String getQemuLibrary() {
 
         //XXX: we encode some characters from the document file path so it's processed
         // correctly by qemu
-        String imagePathConverted = FileUtils.encodeDocumentFilePath(imagePath);
+        String imagePathConverted = FileUtils.encodeDocumentFilePathForHotplug(
+                imagePath, getQemuLibrary());
 
         if (!FileUtils.fileValid(imagePathConverted)) {
             String msg = LimboApplication.getInstance().getString(R.string.CouldNotOpenDocFile) + " "

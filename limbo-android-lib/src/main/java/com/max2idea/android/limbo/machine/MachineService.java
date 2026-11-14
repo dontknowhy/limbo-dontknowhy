@@ -155,11 +155,28 @@ public class MachineService extends Service {
         }
 
         cleanUp();
+        // LIMBO: the QEMU thread has returned; mark the service as idle so
+        // getCurrStatus() no longer reports Running.
+        limboThread = null;
         stopService();
+        MachineController.getInstance().onServiceStopped();
+        // LIMBO: if the SDL activity is showing, close it; otherwise it would
+        // stay on screen (hung) after QEMU has already exited.
+        com.max2idea.android.limbo.dontknowhy.LimboSDLActivity.onVmStopped();
 
-        Log.d(TAG, "Exiting Limbo");
-        //XXX: We exit here to force unload the native libs
-        System.exit(0);
+        Log.d(TAG, "Limbo VM stopped");
+
+        /* LIMBO: qemu_init() may run only once per process, and we could not
+         * make a safe in-process reload work.  Shut the app down cleanly so
+         * the next launch can start a VM again instead of hitting the guard. */
+        stopService();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        android.os.Process.killProcess(android.os.Process.myPid());
+                    }
+                }, 500);
     }
 
 
@@ -213,6 +230,10 @@ public class MachineService extends Service {
 
     public void onDestroy() {
         Log.d(TAG, "Service destroyed");
+        // LIMBO: drop the stale singleton/thread so getCurrStatus() does not
+        // keep reporting Running after the service is gone.
+        service = null;
+        limboThread = null;
         super.onDestroy();
     }
 

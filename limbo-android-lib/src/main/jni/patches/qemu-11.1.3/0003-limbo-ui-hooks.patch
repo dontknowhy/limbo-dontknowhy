@@ -1,0 +1,182 @@
+diff --git a/cpu-common.c b/cpu-common.c
+--- a/cpu-common.c
++++ b/cpu-common.c
+@@ -404,6 +404,15 @@
+ }
+ 
+ /* Add a breakpoint.  */
++#ifdef __LIMBO__
++/*
++ * Limbo: kept for JNI ABI compatibility.  QEMU 11 no longer flushes the
++ * translation cache when a breakpoint is inserted (see
++ * check_for_breakpoints()), so this flag is intentionally unused.
++ */
++int limbo_ignore_breakpoint_invalidate = 0;
++#endif
++
+ int cpu_breakpoint_insert(CPUState *cpu, vaddr pc, int flags,
+                           CPUBreakpoint **breakpoint)
+ {
+diff --git a/hw/display/vga.c b/hw/display/vga.c
+--- a/hw/display/vga.c
++++ b/hw/display/vga.c
+@@ -1496,6 +1496,14 @@
+ /*
+  * graphic modes
+  */
++#ifdef __LIMBO__
++/*
++ * Limbo: the SDL layer cannot force a full repaint, so the Android UI asks
++ * for one by setting this flag through dlsym().
++ */
++int limbo_vga_full_update;
++#endif
++
+ static void vga_draw_graphic(VGACommonState *s, int full_update)
+ {
+     DisplaySurface *surface = qemu_console_surface(s->con);
+@@ -1510,6 +1518,12 @@
+     vga_draw_line_func *vga_draw_line = NULL;
+     bool allocate_surface, force_shadow = false;
+     pixman_format_code_t format;
++#ifdef __LIMBO__
++    if (limbo_vga_full_update) {
++        full_update = 1;
++        limbo_vga_full_update = 0;
++    }
++#endif
+ #if HOST_BIG_ENDIAN
+     bool byteswap = !s->big_endian_fb;
+ #else
+diff --git a/include/ui/console.h b/include/ui/console.h
+--- a/include/ui/console.h
++++ b/include/ui/console.h
+@@ -36,8 +36,17 @@
+ #define QEMU_CAPS_LOCK_LED   (1 << 2)
+ 
+ /* in ms */
++#ifdef __LIMBO__
++/* Limbo: Android UI wants to tune refresh intervals at runtime via dlsym. */
++extern int limbo_sdl_scale_hint;
++extern int gui_refresh_interval_default;
++extern int gui_refresh_interval_idle;
++#define GUI_REFRESH_INTERVAL_DEFAULT gui_refresh_interval_default
++#define GUI_REFRESH_INTERVAL_IDLE gui_refresh_interval_idle
++#else
+ #define GUI_REFRESH_INTERVAL_DEFAULT    30
+ #define GUI_REFRESH_INTERVAL_IDLE     3000
++#endif
+ 
+ /* Color number is match to standard vga palette */
+ enum qemu_color_names {
+diff --git a/ui/console.c b/ui/console.c
+--- a/ui/console.c
++++ b/ui/console.c
+@@ -46,6 +46,11 @@
+ 
+ #include "console-priv.h"
+ 
++#ifdef __LIMBO__
++int gui_refresh_interval_default = 30;
++int gui_refresh_interval_idle = 300;
++#endif
++
+ OBJECT_DEFINE_ABSTRACT_TYPE(QemuConsole, qemu_console, QEMU_CONSOLE, OBJECT)
+ 
+ typedef struct QemuGraphicConsole {
+diff --git a/ui/sdl2-2d.c b/ui/sdl2-2d.c
+--- a/ui/sdl2-2d.c
++++ b/ui/sdl2-2d.c
+@@ -28,6 +28,14 @@
+ #include "ui/input.h"
+ #include "ui/sdl2.h"
+ 
++#ifdef __LIMBO__
++/* Limbo: the standalone qemu-system-x86_64 executable is also linked
++ * without libcompat-limbo (for smoke testing); make the hook weak so that
++ * link succeeds, while the .so used by the app resolves it at load time. */
++extern void Android_JNI_SetVMResolution(int width, int height)
++    __attribute__((weak));
++#endif
++
+ void sdl2_2d_update(DisplayChangeListener *dcl,
+                     int x, int y, int w, int h)
+ {
+@@ -122,6 +130,14 @@
+                                       surface_width(new_surface),
+                                       surface_height(new_surface));
+     sdl2_2d_redraw(scon);
++
++#ifdef __LIMBO__
++    /* Limbo: tell the Android UI about the guest resolution change. */
++    if (Android_JNI_SetVMResolution) {
++        Android_JNI_SetVMResolution(surface_width(new_surface),
++                                    surface_height(new_surface));
++    }
++#endif
+ }
+ 
+ void sdl2_2d_refresh(DisplayChangeListener *dcl)
+diff --git a/ui/sdl2.c b/ui/sdl2.c
+--- a/ui/sdl2.c
++++ b/ui/sdl2.c
+@@ -128,7 +128,15 @@
+ #endif
+     } else {
+         /* The SDL renderer is only used by sdl2-2D, when OpenGL is disabled */
++#if defined(__LIMBO_SDL_FORCE_SOFTWARE_RENDERING__)
++        scon->real_renderer = SDL_CreateRenderer(scon->real_window, -1,
++                                                 SDL_RENDERER_SOFTWARE);
++#elif defined(__LIMBO_SDL_FORCE_HARDWARE_RENDERING__)
++        scon->real_renderer = SDL_CreateRenderer(scon->real_window, -1,
++                                                 SDL_RENDERER_ACCELERATED);
++#else
+         scon->real_renderer = SDL_CreateRenderer(scon->real_window, -1, 0);
++#endif
+     }
+ 
+     sdl_update_caption(scon);
+@@ -868,6 +876,10 @@
+     }
+ }
+ 
++#ifdef __LIMBO__
++int limbo_sdl_scale_hint = -1;
++#endif
++
+ static void sdl2_set_hint_x11_force_egl(void)
+ {
+ #if defined(SDL_HINT_VIDEO_X11_FORCE_EGL) && defined(CONFIG_OPENGL) && \
+@@ -908,6 +920,12 @@
+ 
+     assert(o->type == DISPLAY_TYPE_SDL);
+ 
++#ifdef __LIMBO__
++    if (limbo_sdl_scale_hint == 1) {
++        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
++    }
++#endif
++
+     if (SDL_GetHintBoolean("QEMU_ENABLE_SDL_LOGGING", SDL_FALSE)) {
+         SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
+     }
+diff --git a/ui/vnc.c b/ui/vnc.c
+--- a/ui/vnc.c
++++ b/ui/vnc.c
+@@ -58,8 +58,16 @@
+ #include "io/dns-resolver.h"
+ #include "monitor/monitor.h"
+ 
++#ifdef __LIMBO__
++/* Limbo: allow the Android UI to override the VNC refresh pacing. */
++int vnc_refresh_interval_base = 30;
++int vnc_refresh_interval_inc = 30;
++#define VNC_REFRESH_INTERVAL_BASE vnc_refresh_interval_base
++#define VNC_REFRESH_INTERVAL_INC  vnc_refresh_interval_inc
++#else
+ #define VNC_REFRESH_INTERVAL_BASE GUI_REFRESH_INTERVAL_DEFAULT
+ #define VNC_REFRESH_INTERVAL_INC  50
++#endif
+ #define VNC_REFRESH_INTERVAL_MAX  GUI_REFRESH_INTERVAL_IDLE
+ static const struct timeval VNC_REFRESH_STATS = { 0, 500000 };
+ static const struct timeval VNC_REFRESH_LOSSY = { 2, 0 };

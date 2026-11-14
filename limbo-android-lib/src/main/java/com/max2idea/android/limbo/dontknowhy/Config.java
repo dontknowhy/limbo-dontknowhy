@@ -108,7 +108,7 @@ public class Config {
     public static boolean enableSoftwareUpdates = false;
 
     //TODO: enable immersive mode at some point in time
-    public static boolean enableImmersiveMode = false;
+    public static boolean enableScreenSaver = true;
 
     //TODO: add in settings
     public static boolean legacyDrives = false;

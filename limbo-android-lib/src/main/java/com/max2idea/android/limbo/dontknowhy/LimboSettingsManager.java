@@ -51,7 +51,7 @@ public class LimboSettingsManager extends PreferenceActivity {
     private static final String TAG = "LimboSettingsManager";
 
     // DNS server
-    static String getDNSServer(Context context) {
+    public static String getDNSServer(Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         return prefs.getString("dnsServer", Config.defaultDNSServer);
     }
@@ -238,9 +238,19 @@ public class LimboSettingsManager extends PreferenceActivity {
         return prefs.getBoolean("enableExternalQMP", false);
     }
 
-    public static boolean getImmersiveMode(Context context) {
+    /**
+     * Seconds of no input before the idle screensaver kicks in.
+     * 0 disables it; the settings screen defaults to 30.
+     */
+    public static int getScreensaverTimeout(Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        return prefs.getBoolean("immersiveMode", false);
+        String value = prefs.getString("screensaverTimeout", "30");
+        try {
+            int seconds = Integer.parseInt(value.trim());
+            return Math.max(0, Math.min(seconds, 3600));
+        } catch (NumberFormatException e) {
+            return 30;
+        }
     }
 
     public static int getKeyPressDelay(Context context) {
@@ -262,7 +272,7 @@ public class LimboSettingsManager extends PreferenceActivity {
 
     public static boolean getBackgroundLinus(Context activity) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
-        return prefs.getBoolean("BackgroundSetting", true);
+        return prefs.getBoolean("BackgroundSetting", false);
     }
 
     public static String getDiskCache(Context context) {
@@ -300,7 +310,7 @@ public class LimboSettingsManager extends PreferenceActivity {
         addPreferencesFromResource(R.xml.settings);
         if(Config.enableSoftwareUpdates)
             addPreferencesFromResource(R.xml.software_updates);
-        if(Config.enableImmersiveMode)
+        if(Config.enableScreenSaver)
             addPreferencesFromResource(R.xml.immersive);
         if (Build.VERSION.SDK_INT >= 26)
             addPreferencesFromResource(R.xml.aaudio);

@@ -1,52 +1,18 @@
-// Limbo: Need this to fix the issues with KVM for Android
-//Original/Modified: https://android.googlesource.com/platform/bionic/+/0c11611/libc/bionic/signalfd.cpp
 /*
- * Copyright (C) 2013 The Android Open Source Project
- * All rights reserved.
+ * Intentionally empty.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
+ * This file used to define sigtimedwait() on top of
+ * syscall(__NR_rt_sigtimedwait), because QEMU 5.1's KVM code path called
+ * bionic's (64-bit) implementation and Limbo wanted the raw syscall. QEMU
+ * 11.1.3 on Android runs TCG only and does not reference sigtimedwait; bionic
+ * exports `sigtimedwait` for every API level this app supports (21+).
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * `nm -D --undefined-only` over the whole shipped .so set shows no importer.
+ *
+ * The corrected implementation (with the kernel_sigset_t layout assumption
+ * made explicit, plus a static_assert on sizeof(sigset_t)) is kept for
+ * reference in src/legacy/limbo_compat_signals_legacy.cpp.
+ *
+ * The file is kept (rather than removed) so that the existing
+ * compat/Android.mk source list keeps working unchanged.
  */
-#include <signal.h>
-#include "limbo_compat_signals.h"
-#include "sys/syscall.h"
-#include "unistd.h"
-
-typedef union {
-    sigset_t   bionic;
-    uint32_t   kernel[2];
-} kernel_sigset_t;
-
-int sigtimedwait(const sigset_t* set, siginfo_t* info, const timespec* timeout) {
-    kernel_sigset_t in_set = {
-        .kernel = {
-            [0] = 0,
-            [1] = 0,
-        },
-    };
-    in_set.bionic = *set;
-
-    //XXX Limbo:__rt_gigtimedwait seems not supported for Android 64bit so we use the syscall
-    //return __rt_sigtimedwait(&in_set.bionic, info, timeout, sizeof(in_set));
-    return syscall(__NR_rt_sigtimedwait, &in_set.bionic, info, timeout, sizeof(in_set));
-}

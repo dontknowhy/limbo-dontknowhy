@@ -388,6 +388,10 @@ public class MachineController {
         notifyMachineStatusChangeListeners(machine, getCurrStatus(), null);
     }
 
+    protected void onServiceStopped() {
+        notifyMachineStatusChangeListeners(machine, getCurrStatus(), null);
+    }
+
     protected void updateDisplay(int width, int height, int orientation) {
         machineExecutor.updateDisplay(width, height, orientation);
     }

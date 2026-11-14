@@ -221,8 +221,11 @@
     <string name="EnableQMPForChangingDrives">在设置中启用QMP服务器已更改可移动设备</string>
     <string name="SetVNCPassword">设置VNC密码</string>
     <string name="EnableVNCPassword">启用VNC密码（推荐）</string>
-    <string name="ImmersiveMode">沉浸模式</string>
-    <string name="EnableImmersiveMode">启用沉浸模式</string>
+    <string name="ScreenSaver">待机屏保</string>
+    <string name="ScreenSaverTimeout">待机超时（秒）</string>
+    <string name="RestartingForQemu">QEMU 已在本次运行中使用过，请重新打开 Limbo</string>
+    <string name="ScreenSaverEntered">已进入屏保，点按屏幕恢复</string>
+    <string name="ScreenSaverTimeoutSummary">无操作这么多秒后隐藏界面；0 表示关闭。VNC 下会显示弹跳的 DVD 标志。</string>
     <string name="UsingKeyMapper">使用键盘映射</string>
     <string name="PreventMouseOutOfBounds">防止鼠标超出边界</string>
     <string name="PreventMouseDescr">防止某些系统在使用usb-tablet时崩溃\n警告：在不支持的系统上可能存在不可被鼠标点击的区域。</string>
@@ -254,10 +257,11 @@
     <string name="help">帮助</string>
     <string name="drives">驱动器</string>
     <string name="volume">音量</string>
-    <string name="BackgroundString">使用老莱自拍照作为背景</string>
-    <string name="BackgroundSummary">使用老莱自拍照作为应用的背景（需要重启）（目前不工作）</string>
+    <string name="BackgroundString">使用原神背景</string>
+    <string name="BackgroundSummary">使用原神背景作为应用的背景（需要重启）</string>
     <string name="audio_preference">Audio</string>
     <string name="keymaper_tip">你可以选择一个按键并点击最顶上工具栏的键盘图标来制作一个组合按键</string>
     <string name="bios_installed_msg">BIOS和键盘映射文件已安装</string>
 
+    <string name="special_keys_bar">特殊按键条</string>
 </resources>

@@ -1,0 +1,82 @@
+diff --git a/qemu-img.c b/qemu-img.c
+--- a/qemu-img.c
++++ b/qemu-img.c
+@@ -6053,3 +6053,78 @@
+     /* not found */
+     error_exit(argv[0], "Command not found: %s", cmdname);
+ }
++
++#ifdef __LIMBO__
++/*
++ * Limbo: entry point for creating an image from the Android app.
++ *
++ * qemu-img's CLI paths call exit(), which is unacceptable in-process, so
++ * this wraps the block-layer create path without touching the global exit
++ * machinery.  Returns 0 on success; on failure returns -1 and fills errbuf.
++ */
++int limbo_img_create(const char *filename, const char *fmt, int64_t size,
++                     const char *options, char *errbuf, size_t errlen)
++{
++    BlockDriver *drv;
++    BlockDriver *proto_drv;
++    QemuOptsList *create_opts = NULL;
++    QemuOpts *opts;
++    Error *local_err = NULL;
++    int ret = -1;
++    static bool block_inited;
++
++    if (errbuf && errlen) {
++        errbuf[0] = '\0';
++    }
++    if (!block_inited) {
++        socket_init();
++        error_init("qemu-img");
++        module_call_init(MODULE_INIT_TRACE);
++        qemu_init_main_loop(&error_fatal);
++        qcrypto_init(&error_fatal);
++        module_call_init(MODULE_INIT_QOM);
++        bdrv_init();
++        block_inited = true;
++    }
++
++    drv = bdrv_find_format(fmt);
++    if (!drv) {
++        snprintf(errbuf, errlen, "Unknown file format '%s'", fmt);
++        return -1;
++    }
++    proto_drv = bdrv_find_protocol(filename, true, &local_err);
++    if (!proto_drv) {
++        snprintf(errbuf, errlen, "%s", error_get_pretty(local_err));
++        error_free(local_err);
++        return -1;
++    }
++    if (!drv->create_opts || !proto_drv->create_opts) {
++        snprintf(errbuf, errlen, "Format/protocol does not support creation");
++        return -1;
++    }
++
++    create_opts = qemu_opts_append(create_opts, drv->create_opts);
++    create_opts = qemu_opts_append(create_opts, proto_drv->create_opts);
++    opts = qemu_opts_create(create_opts, NULL, 0, &error_abort);
++
++    if (options && options[0] &&
++        !qemu_opts_do_parse(opts, options, NULL, &local_err)) {
++        snprintf(errbuf, errlen, "%s", error_get_pretty(local_err));
++        error_free(local_err);
++        goto out;
++    }
++
++    qemu_opt_set_number(opts, BLOCK_OPT_SIZE, size, &error_abort);
++    if (bdrv_create(drv, filename, opts, &local_err) < 0) {
++        snprintf(errbuf, errlen, "%s", error_get_pretty(local_err));
++        error_free(local_err);
++        goto out;
++    }
++    ret = 0;
++
++out:
++    qemu_opts_del(opts);
++    qemu_opts_free(create_opts);
++    return ret;
++}
++#endif

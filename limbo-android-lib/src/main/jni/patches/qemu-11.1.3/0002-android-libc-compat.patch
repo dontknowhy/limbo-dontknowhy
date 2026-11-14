@@ -1,0 +1,265 @@
+diff --git a/audio/ossaudio.c b/audio/ossaudio.c
+--- a/audio/ossaudio.c
++++ b/audio/ossaudio.c
+@@ -25,7 +25,7 @@
+ #include "qemu/osdep.h"
+ #include "qapi-types-audio.h"
+ #include <sys/ioctl.h>
+-#include <sys/soundcard.h>
++#include <linux/soundcard.h>
+ #include "qemu/main-loop.h"
+ #include "qemu/module.h"
+ #include "qemu/host-utils.h"
+diff --git a/block/file-posix.c b/block/file-posix.c
+--- a/block/file-posix.c
++++ b/block/file-posix.c
+@@ -427,7 +427,7 @@
+     bs->bl.request_alignment = 0;
+     s->buf_align = 0;
+ 
+-#if defined(__linux__) && defined(STATX_DIOALIGN)
++#if defined(__linux__) && defined(STATX_DIOALIGN) && !defined(__ANDROID__)
+     struct statx stx;
+ 
+     /*
+diff --git a/block.c b/block.c
+--- a/block.c
++++ b/block.c
+@@ -864,7 +864,8 @@
+      * /var/tmp is usually on a disk, so more appropriate for disk images.
+      */
+     if (!g_strcmp0(tmpdir, "/tmp")) {
+-        tmpdir = "/var/tmp";
++        /* Android has no /tmp or /var/tmp; use the app private cache. */
++        tmpdir = "/data/data/com.max2idea.android.limbo.dontknowhy/cache";
+     }
+ #endif
+ 
+diff --git a/chardev/char-pty.c b/chardev/char-pty.c
+--- a/chardev/char-pty.c
++++ b/chardev/char-pty.c
+@@ -237,6 +237,12 @@
+ # include <termios.h>
+ #endif
+ 
++/* Android API < 23 has no openpty() declaration (util/limbo-openpty.c). */
++#if defined(__ANDROID__) && defined(__ANDROID_API__) && __ANDROID_API__ < 23
++int openpty(int *amaster, int *aslave, char *name,
++            const struct termios *termp, const struct winsize *winp);
++#endif
++
+ #ifdef __sun__
+ 
+ #if !defined(HAVE_OPENPTY)
+diff --git a/common-user/mmap-min-addr.c b/common-user/mmap-min-addr.c
+--- a/common-user/mmap-min-addr.c
++++ b/common-user/mmap-min-addr.c
+@@ -19,7 +19,13 @@
+      * We prefer to not make NULL pointers accessible to QEMU.
+      * If something goes wrong below, fall back to 1 page.
+      */
++#ifdef __ANDROID__
++    // Go with 8 pages (32768 bytes) as default value for Android (Termux).
++    // Issue https://github.com/termux/termux-packages/issues/6172.
++    size_t min_addr = qemu_real_host_page_size() * 8;
++#else
+     size_t min_addr = qemu_real_host_page_size();
++#endif
+     /*
+      * Read in mmap_min_addr kernel parameter.  This value is used
+      * When loading the ELF image to determine whether guest_base
+diff --git a/fsdev/9p-marshal.h b/fsdev/9p-marshal.h
+--- a/fsdev/9p-marshal.h
++++ b/fsdev/9p-marshal.h
+@@ -47,6 +47,18 @@
+     int64_t mtime_nsec;
+ } V9fsIattr;
+ 
++#ifdef st_atime_nsec
++# undef st_atime_nsec
++#endif
++
++#ifdef st_mtime_nsec
++# undef st_mtime_nsec
++#endif
++
++#ifdef st_ctime_nsec
++# undef st_ctime_nsec
++#endif
++
+ typedef struct V9fsStatDotl {
+     uint64_t st_result_mask;
+     V9fsQID qid;
+diff --git a/hw/9pfs/9p-local.c b/hw/9pfs/9p-local.c
+--- a/hw/9pfs/9p-local.c
++++ b/hw/9pfs/9p-local.c
+@@ -545,9 +545,23 @@
+     rewinddir(fs->dir.stream);
+ }
+ 
++struct DIR {
++    int fd_;
++};
++
++static long android_telldir(struct DIR *dirp)
++{
++    return (long) lseek(dirp->fd_, 0, SEEK_CUR);
++}
++
++static void android_seekdir(DIR *dirp, long loc)
++{
++    (void) lseek(dirp->fd_, loc, SEEK_SET);
++}
++
+ static off_t local_telldir(FsContext *ctx, V9fsFidOpenState *fs)
+ {
+-    return telldir(fs->dir.stream);
++    return android_telldir(fs->dir.stream);
+ }
+ 
+ static bool local_is_mapped_file_metadata(FsContext *fs_ctx, const char *name)
+@@ -590,7 +604,7 @@
+ 
+ static void local_seekdir(FsContext *ctx, V9fsFidOpenState *fs, off_t off)
+ {
+-    seekdir(fs->dir.stream, off);
++    android_seekdir(fs->dir.stream, off);
+ }
+ 
+ static ssize_t local_preadv(FsContext *ctx, V9fsFidOpenState *fs,
+diff --git a/util/drm.c b/util/drm.c
+--- a/util/drm.c
++++ b/util/drm.c
+@@ -17,7 +17,6 @@
+ #include "qemu/osdep.h"
+ #include "qemu/drm.h"
+ 
+-#include <glob.h>
+ #include <dirent.h>
+ 
+ int qemu_drm_rendernode_open(const char *rendernode)
+diff --git a/util/oslib-posix.c b/util/oslib-posix.c
+--- a/util/oslib-posix.c
++++ b/util/oslib-posix.c
+@@ -61,6 +61,62 @@
+ #include "qemu/memalign.h"
+ #include "qemu/mmap-alloc.h"
+ 
++/*
++ * Android/bionic does not provide POSIX shared memory.  Emulate shm_open(3)
++ * with regular files in a writable directory (based on the Termux patch).
++ */
++static const char *limbo_shm_dir(void)
++{
++    const char *dir = getenv("TMPDIR");
++
++    if (dir && *dir) {
++        return dir;
++    }
++    return "/data/data/com.max2idea.android.limbo.dontknowhy/cache";
++}
++
++static int shm_unlink(const char *name)
++{
++    g_autofree char *fname = NULL;
++
++    while (name[0] == '/') {
++        name++;
++    }
++    if (name[0] == '\0') {
++        errno = EINVAL;
++        return -1;
++    }
++    fname = g_strdup_printf("%s/%s", limbo_shm_dir(), name);
++    return unlink(fname);
++}
++
++static int shm_open(const char *name, int oflag, mode_t mode)
++{
++    g_autofree char *fname = NULL;
++    int fd;
++    int flags;
++
++    while (name[0] == '/') {
++        name++;
++    }
++    if (name[0] == '\0') {
++        errno = EINVAL;
++        return -1;
++    }
++    fname = g_strdup_printf("%s/%s", limbo_shm_dir(), name);
++    fd = open(fname, oflag, mode);
++    if (fd != -1) {
++        flags = fcntl(fd, F_GETFD, 0);
++        if (flags == -1 || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
++            int save_errno = errno;
++            close(fd);
++            fd = -1;
++            errno = save_errno;
++        }
++    }
++    return fd;
++}
++
+ #define MAX_MEM_PREALLOC_THREAD_COUNT 32
+ 
+ struct MemsetThread;
+diff --git a/util/limbo-openpty.c b/util/limbo-openpty.c
+--- a/util/limbo-openpty.c
++++ b/util/limbo-openpty.c
+@@ -0,0 +1,55 @@
++/*
++ * openpty(3) replacement for Android/bionic API < 23.
++ *
++ * Bionic declares openpty() in <pty.h> but only provides it from API 23;
++ * Limbo targets API 21, so provide our own implementation built on
++ * posix_openpt()/ptsname(), which are available earlier.
++ */
++#include "qemu/osdep.h"
++
++#include <termios.h>
++#include <sys/ioctl.h>
++
++int openpty(int *amaster, int *aslave, char *name,
++            const struct termios *termp, const struct winsize *winp)
++{
++    int master, slave;
++    const char *slave_name;
++
++    master = posix_openpt(O_RDWR | O_NOCTTY);
++    if (master < 0) {
++        return -1;
++    }
++
++    if (grantpt(master) < 0 || unlockpt(master) < 0) {
++        goto err;
++    }
++
++    slave_name = ptsname(master);
++    if (!slave_name) {
++        goto err;
++    }
++    if (name) {
++        strcpy(name, slave_name);
++    }
++
++    slave = open(slave_name, O_RDWR | O_NOCTTY);
++    if (slave < 0) {
++        goto err;
++    }
++
++    if (termp) {
++        tcsetattr(slave, TCSAFLUSH, termp);
++    }
++    if (winp) {
++        ioctl(slave, TIOCSWINSZ, winp);
++    }
++
++    *amaster = master;
++    *aslave = slave;
++    return 0;
++
++err:
++    close(master);
++    return -1;
++}

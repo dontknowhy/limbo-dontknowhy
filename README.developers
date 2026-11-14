@@ -1,343 +1,407 @@
-Limbo Emulator (QEMU) for Android
-
+Limbo Emulator (QEMU 11.1.3) for Android
 ================================================================================
 
-1. What is Limbo?
+1. What is this?
+--------------------------------------------------------------------------------
 
-Limbo is a QEMU-based emulator for Android. It currently supports PC emulation 
-for Intel x86 architecture.
-For more information, instructions, guides, known issues, and downloads visit:
-https://github.com/limboemu/limbo
+Limbo is a QEMU-based emulator for Android.  This fork upgrades the original
+QEMU 5.1.0 integration to **QEMU 11.1.3** for arm64-v8a devices:
 
-===============================================================================
+  * `libqemu-system-x86_64.so`  – the system emulator, dlopen()ed by the app
+  * `libqemu-img.so`            – the block layer, used to create disk images
+  * `liblimbo.so`               – JNI control plane + callbacks QEMU/SDL need
+  * glib/pixman/SDL2/libslirp/libffi/zlib-ng/zstd/pcre2/libiconv – cross-built
+    dependencies shipped in `jniLibs/arm64-v8a`
 
-2. Requirements:
+Only arm64-v8a is supported.  QEMU is built as a normal executable with meson
+and then re-linked as a shared object; the app loads it at runtime.
 
-    Android SDK
-    Android NDK: r14b/gcc or r23b/clang
-    Android Studio (3.1.1 preferred)
-    Android device with Android OS 8.0 (Oreo) and above
-    Linux Desktop pc (Ubuntu preferred)
-    Make sure you have the following packages installed, if not run:
-    sudo apt-get install make autoconf automake git python binutils 
-    sudo apt-get install libtool-bin pkg-config flex bison gettext texinfo rsync
-    For development you can use your own editors Geany is highly
-	recommended for editing the native code
+The QEMU source tree is **not** committed.  All local changes are a patch
+series under `limbo-android-lib/src/main/jni/patches/qemu-11.1.3/`, applied by
+`make prepare`.  That directory is the authoritative record of every QEMU
+change; regenerate the patches after editing `jni/qemu`, never edit the
+downloaded tree and leave it there.
 
-===============================================================================
+virgl/OpenGL acceleration (MobileGL) is not implemented in this build: QEMU is
+configured with `--disable-opengl --disable-virglrenderer`.
 
-3. Known Issues:
-    https://github.com/limboemu/limbo/issues
 
-===============================================================================
+2. Requirements
+--------------------------------------------------------------------------------
 
-4. Update Configuration
+Host (Linux x86_64 is what was used):
 
-    If you build the supported QEMU version then the only thing you need to do is edit file:
-    limbo-android-lib/src/main/jni/android-limbo-config.mak
-    In all other cases you have to look at the config files under:
-    limbo-android-lib/src/main/jni/android-config/
-    
-    For more information see the Building section.
-    	
+    make autoconf automake libtool-bin pkg-config flex bison gettext
+    python3 python3-venv cmake (>= 3.24) ninja-build meson patchelf curl git
+    ccache (optional)
 
-5. Get and Compile external libraries
+Android toolchain:
 
-    #Make sure you're under the jni directory
-    cd ./limbo-android-lib/src/main/jni
-    
-    # Now download the source code for the external libraries and unzip them under the jni directory
-    #Note: if some of these file links don't download with wget use your browser to download them
+    Android NDK r30 (30.0.16248370), clang 21
+    Android SDK platform 31
+    Android SDK build-tools 35.0.0  (needed for `zipalign -P 16`)
+    JDK 17
+    Gradle 8.2.1
 
-    ##### Get QEMU
-    # download link:  http://download.qemu-project.org/qemu-x.x.x.tar.xz 
-    # Current versions supported by limbo: 5.1.0 and 2.9.1
-    # example for version 5.1.0:
-    wget http://download.qemu-project.org/qemu-5.1.0.tar.xz -P /tmp/
-    tar -xJf /tmp/qemu-5.1.0.tar.xz
-    mv qemu-5.1.0 qemu
-    # For QEMU version 2.9.1:
-    wget http://download.qemu-project.org/qemu-2.9.1.tar.xz -P /tmp/
-    tar -xJf /tmp/qemu-2.9.1.tar.xz
-    mv qemu-2.9.1 qemu
+The workspace used for development looks like this (the app repo may live
+anywhere, but `deps/`, `build/` and `prebuilt/` sit next to it by default):
 
-    ##### GET glib
-    wget https://ftp.gnome.org/pub/GNOME/sources/glib/2.56/glib-2.56.1.tar.xz -P /tmp/
-    tar -xJf /tmp/glib-2.56.1.tar.xz
-    mv glib-2.56.1 glib
+    limbo/                       # workspace root (LIMBO_ROOT)
+    ├── envsetup.sh              # interactive shell helper
+    ├── deps/                    # source tarballs (see §5)
+    ├── prebuilt/arm64-v8a/      # cross-built dependencies (PREFIX)
+    ├── build/                   # native build trees and build outputs
+    ├── android-ndk-r30/
+    ├── android-sdk/
+    ├── jdk-17/
+    ├── gradle-8.2.1/
+    └── limbo-dontknowhy/        # this repository
+        ├── Makefile             # native + APK build
+        ├── scripts/             # build scripts used by the Makefile
+        ├── keystore/            # release signing key (see §9)
+        └── limbo-android-lib/src/main/jni/
+            ├── patches/qemu-11.1.3/   # QEMU patch series
+            ├── patches/setjmp-aarch64/# bionic sigsetjmp replacement
+            ├── limbo/, compat/        # liblimbo.so sources
+            ├── qemu/ glib/ pixman/ SDL2/ libffi/  # extracted sources (ignored)
 
-    ##### GET libffi
-    wget https://sourceware.org/pub/libffi/libffi-3.3.tar.gz -P /tmp/
-    tar -xzf /tmp/libffi-3.3.tar.gz
-    mv libffi-3.3 libffi
+If your layout differs, pass `LIMBO_ROOT=`, `PREFIX=`, `BUILD=` or `DEPS=` to
+make.  `scripts/env.sh` derives everything from its own location and honours
+the same variables; `envsetup.sh` in the workspace root is a thin wrapper for
+interactive shells:
 
-    ##### GET pixman
-    wget https://www.cairographics.org/releases/pixman-0.40.0.tar.gz -P /tmp/
-    tar -xzf /tmp/pixman-0.40.0.tar.gz
-    mv pixman-0.40.0 pixman
+    source ./envsetup.sh
 
-    ##### GET SDL2
-    wget https://www.libsdl.org/release/SDL2-2.0.8.tar.gz -P /tmp/
-    tar -xzf /tmp/SDL2-2.0.8.tar.gz
-    mv SDL2-2.0.8 SDL2
 
-    Now you should have this directory structure:
-    jni/
-        android-config/
-        compat/
-        glib/
-        libffi/
-        limbo/
-        patches/
-        pixman/
-        qemu/
-        SDL2/
+3. Quick start
+--------------------------------------------------------------------------------
 
-===============================================================================
+    # one-time: fetch tarballs if deps/ is empty
+    make -C limbo-dontknowhy deps-fetch
 
-6. Apply patches
+    # build everything and produce a signed release APK
+    make -C limbo-dontknowhy apk
 
-    ### Apply patch for QEMU:
-    # example for 5.1.0:
-    cd ./limbo-android-lib/src/main/jni/qemu/
-    patch -p1 < ../patches/qemu-5.1.0.patch
-    # for 2.9.1:
-    patch -p1 < ../patches/qemu-2.9.1.patch
+The result is `build/limbo-x86-qemu11-arm64-release.apk` (workspace `build/`,
+not the repo's Gradle `build/`), 16 KB aligned and signed.  For day-to-day
+iteration:
 
-    ### Apply glib patch for Limbo:
-    cd ./limbo-android-lib/src/main/jni/glib/
-    patch -p1 < ../patches/glib-2.56.1.patch
+    make -C limbo-dontknowhy native      # dependencies + QEMU + liblimbo
+    make -C limbo-dontknowhy apk-debug   # debug-signed APK
 
-    ### Apply SDL2 patch for Limbo:
-    cd ./limbo-android-lib/src/main/jni/SDL2/
-    patch -p1 < ../patches/sdl2-2.0.8.patch
+The historical entry point still works:
 
-    ### Other QEMU versions:
-    # If you want to redistribute Limbo build with other QEMU versions, create your own patch like this:
-    cd /limbo-android-lib/src/main/jni/qemu/
-    diff -ru --no-dereference /tmp/qemu-x.x.x . | grep -v '^Only in' > ../patches/qemu-x.x.x.patch
-    Don't forget to create your android-qemu-config-x.x.x.mak file
-      and include it in android-qemu-config.mak
+    cd limbo-dontknowhy/limbo-android-lib/src/main/jni
+    make            # == make native
+    make apk
 
-===============================================================================
+
+4. Versions
+--------------------------------------------------------------------------------
+
+    QEMU          11.1.3
+    glib          2.90.1      (needs libffi, pcre2, libiconv, proxy-libintl)
+    pixman        0.46.4
+    SDL2          2.32.10
+    zlib-ng       2.3.3       (ZLIB_COMPAT mode, installs libz.so)
+    zstd          1.5.7
+    pcre2         10.49
+    libiconv      1.18
+    libffi        3.4.3
+    libslirp      4.9.7
+    proxy-libintl 0.5         (glib subproject, built by glib)
+    NDK           r30 / clang 21
+    API           21 (minSdk), targetSdk 29
+    ABI           arm64-v8a
+
+Compile flags are pure armv8-a plus the optional extensions:
+
+    -march=armv8-a+simd+crc+crypto -mtune=cortex-a76 -O3 -fPIC
+
+NEON is part of the AArch64 baseline; the old `--disable-arm-neon` flags are
+gone.  QEMU's release build uses **full LTO** (`-Db_lto=true
+-Db_lto_mode=default`), which measured ~6-7% faster TCG than a non-LTO build
+for ~4 MB more `.so`.
+
+Extra optimisation flags were also benchmarked (the safe subset of the old
+`build.sh`: `-fdata-sections -ffunction-sections -fmerge-all-constants
+-fomit-frame-pointer -fno-semantic-interposition` + vectorisation; Polly,
+libomp, libunwind and `-fno-emulated-tls` are deliberately not used).  On a
+Xiaomi 2410DPN6CC with Alpine 3.24, 256 MB `dd if=/dev/zero bs=1M count=256 |
+md5sum`, `taskset 40`, five runs each: baseline 6.64/6.63/8.36/8.33/6.67 s vs
+optimised 6.66/6.68/6.67/8.38/6.66 s — inside the noise, and `.text` only
+shrank by 1.4%.  They are therefore **not** enabled.  To repeat the
+experiment: `EXTRA_CFLAGS="..." QEMU_BUILD=$BUILD/qemu-build-opt
+scripts/qemu-configure.sh`, then build/relink as usual.
+
+
+5. Source tarballs (`deps/`)
+--------------------------------------------------------------------------------
+
+The build extracts sources into `jni/` (QEMU/glib/pixman/SDL2/libffi) and
+`build/src/` (the rest).  `scripts/fetch-deps.sh` downloads whatever is
+missing and verifies sha256:
+
+    qemu-11.1.3.tar.xz        https://download.qemu.org/
+    glib-2.90.1.tar.xz        https://download.gnome.org/sources/glib/2.90/
+    pixman-0.46.4.tar.xz      https://cairographics.org/releases/
+    SDL2-2.32.10.tar.gz       https://github.com/libsdl-org/SDL/releases/
+    libffi-3.4.3.tar.gz       https://github.com/libffi/libffi/releases/
+    zlib-ng-2.3.3.tar.gz      https://github.com/zlib-ng/zlib-ng/
+    zstd-1.5.7.tar.gz         https://github.com/facebook/zstd/releases/
+    pcre2-10.49.tar.gz        https://github.com/PCRE2Project/pcre2/releases/
+    libiconv-1.18.tar.gz      https://ftp.gnu.org/pub/gnu/libiconv/
+    proxy-libintl-0.5.tar.gz  https://github.com/frida/proxy-libintl/
+    libslirp-4.9.7.tar.gz     https://gitlab.freedesktop.org/slirp/libslirp/
+
+`git clone` of libslirp v4.9.7 works too if you repack it, but use the
+tarball: `git archive --prefix=libslirp-4.9.7/ v4.9.7`.  4.9.0 does **not**
+link with lld (its version script fails); 4.9.7 is required.
+
+No host library is ever picked up: the meson cross files set
+`pkg_config_libdir=$PREFIX/lib/pkgconfig` and QEMU is configured with
+`PKG_CONFIG_LIBDIR` pointing at the same directory.
+
+
+6. QEMU patch series
+--------------------------------------------------------------------------------
+
+`jni/patches/qemu-11.1.3/` (apply in order; `make prepare` does it):
+
+    0001-android-build-meson.patch
+        meson/configure fixes for bionic: no librt/shm_open, never probe X11,
+        skip signalfd/ivshmem, build util/limbo-openpty.c, define
+        SDL_MAIN_HANDLED in system/main.c.
+
+    0002-android-libc-compat.patch
+        Missing/divergent libc interfaces: /tmp and /var/tmp replacement paths,
+        statx DIOALIGN, tellDir/seekDir (bionic has no telldir), SCSI/9p
+        name clashes, openpty declaration, mmap_min_addr default (Termux
+        workaround), `linux/soundcard.h`, no <glob.h>, and a shm_open()
+        emulation backed by files in the app cache.
+
+    0003-limbo-ui-hooks.patch
+        Hooks used by the Android UI: VGA full repaint flag, tunable SDL/VNC
+        refresh intervals, SDL scale hint, and the weak
+        Android_JNI_SetVMResolution callback from sdl2-2d.
+
+    0004-android-audio-backends.patch
+        Native OpenSL ES and AAudio audio backends (`audio/openslesaudio.c`,
+        `audio/aaudioaudio.c`, QAPI definitions, meson probes).  AAudio is
+        loaded with dlopen("libaaudio.so") so the library still loads on
+        API 21.  Both are output+input (microphone capture works).
+
+    0005-qemu-img-inprocess.patch
+        `limbo_img_create()`: calls bdrv_create() directly so the app can
+        create qcow2/raw/vmdk/vdi/vhdx/qed/vpc/parallels images without
+        going through qemu-img's main() and its exit() calls.
+
+    0006-fdset-hotplug.patch
+        `limbo_fdset_add()`: register a file descriptor with QEMU's fdset
+        machinery without a monitor/SCM_RIGHTS, used for changing removable
+        media while the VM is running.  (`-add-fd` only exists on the command
+        line; QMP's add-fd needs SCM_RIGHTS.)
+
+New QEMU files added by the series:
+
+    audio/openslesaudio.c, audio/aaudioaudio.c, util/limbo-openpty.c
+
+`patches/setjmp-aarch64/` is not a QEMU patch: it contains the AOSP
+`sigsetjmp`/`siglongjmp` implementation that replaces bionic's.  bionic's
+versions are PAC-signed and crash (SIGILL, ESR 0x72000000) when a coroutine
+switches stacks/threads.  `scripts/link-qemu-so.py` links it with
+`--whole-archive` and binds QEMU's internal references with
+`-Bsymbolic-functions`.
+
+Regenerating the patches after changing `jni/qemu`:
+
+    cd /tmp && rm -rf qemu-pristine && tar -xf $LIMBO_ROOT/deps/qemu-11.1.3.tar.xz
+    # ... create the per-topic diffs, then verify they apply cleanly:
+    cd /tmp/qemu-pristine && for p in $JNI/patches/qemu-11.1.3/*.patch; do
+        patch -p1 < "$p"; done
+    # the result must be identical to $JNI/qemu
+
 
 7. Build
+--------------------------------------------------------------------------------
 
-    a. To build the native part of the app make sure you're under the jni directory:
-        cd limbo-android-lib/src/main/jni
-        
-    Make sure you update file android-limbo-config.mak with the NDK folder to your installation folder
-    keep in mind the last NDK version  that supported gcc was r14b. The alternative is to use clang 
-    with ndk version r23. For example: 
-    NDK_ROOT = /home/dev/tools/ndk/android-ndk-r14b
+All targets are in the app-level `Makefile`:
 
-    The rest of the configuration is for specifying the right QEMU version: USE_QEMU_VERSION
-    the host architecture (android device): BUILD_HOST
-    and the emulator guest architecture: BUILD_GUEST
-    
-    b. From Android Studio import BOTH the Android library limbo-android-lib AND the module for the guest
-        architecture you need (x86,arm,ppc,sparc) ie limbo-android-x86.
-        
-    c. Build the native libraries:
-        # Make sure you're still under the jni directory:
-        cd limbo-android-lib/src/main/jni
+    make prepare      extract sources, apply QEMU patches, generate cross file
+    make deps         zlib-ng -> zstd -> pcre2 -> libiconv -> libffi -> glib
+                      -> pixman -> libslirp -> SDL2, installed into $PREFIX
+    make liblimbo     jni/limbo + jni/compat -> jniLibs/arm64-v8a/liblimbo.so
+    make qemu         QEMU configure + ninja + re-link -> libqemu-system-*.so
+    make native       all of the above
+    make jnilibs      copy the dependency .so files into jniLibs
+    make apk          release APK (see §9)
+    make apk-debug    debug APK
 
-        # Instead of editing android-limbo-config.mak you can also supply the variables on the command line.
-        # For example:
-            export BUILD_HOST=<EABI>
-            export BUILD_GUEST=<GUEST_ARCH>
-            export NDK_DEBUG=<ENABLE_DEBUG>
+Stamps live in `build/.stamps/`; delete one (or `make distclean`) to force a
+step to run again.
 
-        where:
-            EABI is the Android device type (host arch): armeabi-v7a, arm64-v8a, x86, x86_64
-            GUEST_ARCH is the Emulator type: x86_64-softmmu,aarch64-softmmu,sparc64-softmmu,ppc64-softmmu
-            ENABLE_DEBUG is 1 (optional)
+Manual equivalents, if you want to see what the Makefile does:
 
-        # To start the build type on your terminal:
-            make limbo
-            
-        Notes:
-        If you want to remove ALL previously compiled native objects and libraries:
-        make clean
+    # dependencies (meson example: glib)
+    meson setup build/glib-build $JNI/glib \
+        --cross-file build/config-meson.cross --prefix=$PREFIX \
+        --buildtype=release -Dtests=false -Dintrospection=disabled ... 
+    ninja -C build/glib-build install
 
-        If you're building apk for multiple host architectures you need to do in between builds:
-        make distclean
+    # QEMU
+    scripts/qemu-configure.sh          # writes build/qemu-build
+    ninja -C build/qemu-build qemu-system-x86_64 qemu-img
+    python3 scripts/link-qemu-so.py build/qemu-build \
+        qemu-system-x86_64 libqemu-system-x86_64.so
+    python3 scripts/link-qemu-so.py build/qemu-build qemu-img libqemu-img.so
+    scripts/fix-needed.sh jniLibs/arm64-v8a/libqemu-*.so
 
-        If you're building apk for multiple guest architectures you can specify them with commas:
-        BUILD_GUEST=x86_64-softmmu,aarch64-softmmu
+QEMU is configured through its own `configure` (it generates
+`config-host.mak`, the target list and the meson cross file).  The important
+switches are listed at the top of `scripts/qemu-configure.sh`; notable ones:
 
-        Examples:
-        1) To build Limbo x86 Emulator for ARM64 phones type:
-            export BUILD_HOST=arm64-v8a
-            export BUILD_GUEST=x86_64-softmmu
-            make limbo
+    --target-list=x86_64-softmmu
+    --enable-sdl --audio-drv-list=sdl,opensles,aaudio
+    --enable-vnc --enable-zstd --enable-iconv --enable-slirp
+    --with-coroutine=sigaltstack --enable-trace-backends=nop
+    --disable-opengl --disable-virglrenderer
+    -Db_lto=true -Db_lto_mode=default
 
-        2) To build Limbo x86 Emulator for ARM phones type:
-            export BUILD_HOST=armeabi-v7a
-            export BUILD_GUEST=x86_64-softmmu
-            make limbo
+`coroutine_backend=sigaltstack` is required: bionic has no ucontext and the
+sigaltstack backend is the one that works with the setjmp replacement.
 
-        3) To build Limbo ARM Emulator for ARM64 phones type:
-            export BUILD_HOST=arm64-v8a
-            export BUILD_GUEST=aarch64-softmmu
-            make limbo
 
-        4) To build Limbo x86 Emulator for Intel x86 32bit phones/tablets/PCs type:
-            export BUILD_HOST=x86
-            export BUILD_GUEST=x86_64-softmmu
-            make limbo
+8. Relinking and DT_NEEDED
+--------------------------------------------------------------------------------
 
-        5) To build Limbo x86 Emulator for Intel x86 64bit PCs type:
-            export BUILD_HOST=x86_64
-            export BUILD_GUEST=x86_64-softmmu
-            make limbo
+QEMU 11 has no Makefile.target hook, so `scripts/link-qemu-so.py` parses
+`build.ninja`, takes the object list and `LINK_ARGS` of the `qemu-system-*`
+and `qemu-img` edges and re-links them with `-shared`.  Object order matters
+(objects before archives).  The script adds:
 
-        6) To build Limbo ARM Emulator for ARM64 phones for debugging type:
-            export NDK_DEBUG=1
-            export BUILD_HOST=arm64-v8a
-            export BUILD_GUEST=aarch64-softmmu
-            make limbo
+    -Wl,-z,max-page-size=16384     # 16 KB page devices
+    -Wl,--whole-archive libandroid-setjmp.a -Wl,--no-whole-archive
+    -Wl,-Bsymbolic-functions
+    -Wl,--no-as-needed -llimbo -Wl,--as-needed     # QEMU only
 
-        7) To build multiple Limbo emulators for ARM phones type:
-            export BUILD_HOST=arm64-v8a
-            export BUILD_GUEST=x86_64-softmmu,aarch64-softmmu
-            make limbo
+The `--no-as-needed -llimbo` is important: `Android_JNI_SetVMResolution` is a
+*weak* reference, so the default `--as-needed` drops `liblimbo.so` from
+`DT_NEEDED`, and on bionic a dlopen'ed library only resolves against its own
+`DT_NEEDED` set — the callback would silently stay NULL and SDL would never
+report resolution changes to the UI.
 
-		8) To build limbo for older devices with gcc set the following options:
-			export NDK_ROOT=/home/dev/tools/ndk/android-ndk-r14b
-			export USE_GCC=true
-			export BUILD_HOST=armeabi-v7a
-			export BUILD_GUEST=x86_64-softmmu
-			export USE_QEMU_VERSION=2.9.1
-			export USE_AAUDIO=false
+The dependencies in `$PREFIX/lib` have normal sonames
+(`libglib-2.0.so.0`, `libpixman-1.so.0`, ...) while Android packages the
+files as `libglib-2.0.so`, `libpixman-1.so`, ...  `scripts/fix-needed.sh`
+renames the `DT_NEEDED` entries with patchelf after linking (and
+`scripts/sync-jnilibs.sh` copies the real files under the packaged names).
 
-		For more options see android-limbo-config.mak
-		
-       You should now have the following libraries in these 2 folders:
+`jniLibs/arm64-v8a/` after a build:
 
-       limbo-android-lib/src/main/jniLibs/<EABI>/
-         libcompat-iconv.so
-         libcompat-intl.so
-         libcompat-limbo.so
-         libcompat-SDL2-ext.so
-         libglib-2.0.so
-         liblimbo.so
-         libpixman-1.so
-         libSDL2.so
+    libSDL2.so libffi.so libgio-2.0.so libglib-2.0.so libgmodule-2.0.so
+    libgobject-2.0.so libiconv.so libintl.so liblimbo.so libpcre2-8.so
+    libpixman-1.so libqemu-img.so libqemu-system-x86_64.so libslirp.so
+    libz.so libzstd.so
 
-       limbo-android-<GUEST_ARCH>/src/main/jniLibs/<EABI>/
-         libqemu-system-xxx.so
+`libcompat-limbo.so` no longer exists; its two exported entry points
+(`set_jni`, `Android_JNI_SetVMResolution`, plus `FileUtils.nativeAddFd`) are
+part of `liblimbo.so`, which only needs liblog/libdl/libc.
 
-        Note:
-            When you build the apk in Android Studio it will contain the libraries from both
-            folders so you don't need to copy files manually.
 
-    d. Build the Android apk for the corresponding guest using Android Studio.
-        Make sure the *.so libraries are zipped in the final .apk
-        
-    e. To build from the command line instead of Android Studio:
-        export ANDROID_SDK_ROOT=~/Android/Sdk
-    	gradle wrapper
-    	./gradlew assembleRelease
+9. APK packaging and signing
+--------------------------------------------------------------------------------
 
-    f. If you want to build the debugging version:
-        Set variables in Config.java:
-          debug = true;
-        Modify android-config/android-limbo-config.mak and point to a configuration
-          with no optimization:
-        USE_OPTIMIZATION=false
+`make apk` runs:
 
-        Follow the steps to build the native libraries as described above
-        export NDK_DEBUG=1
+    gradle :limbo-android-x86:assembleRelease        # unsigned APK
+    zipalign -P 16 -f 4 ...                          # 16 KB alignment
+    apksigner sign --ks keystore/limbo-release.jks ... 
+    zipalign -c -P 16 4 ... ; apksigner verify ...
 
-        Important:
-           From Android studio click Build> Rebuild Project and Run > Debug
+Native libraries are stored **uncompressed** (`useLegacyPackaging = false`).
+Android 15+ requires uncompressed `.so` files to be 16 KB aligned inside the
+APK and every ELF LOAD segment to be 16 KB aligned; the NDK r30 toolchain and
+the explicit `-Wl,-z,max-page-size=16384` handle the ELF side, while
+`zipalign -P 16` (build-tools 35.0.0 or newer) handles the ZIP side.  Older
+zipalign (33/34) only knows `-p` (4 KB) and will leave the warning in place.
 
-===============================================================================
+Signing key: `keystore/limbo-release.jks` with `keystore/keystore.properties`
+(passwords in clear text).  This is a **published demo key** so that every
+build of this fork upgrades the previous one; do not reuse it for anything
+else.  `make keystore` regenerates it if you delete both files, but then
+existing installs must be uninstalled first (signature mismatch).
 
-8. Debugging
-        To debug the native code for a particular guest:
+Output: `build/limbo-x86-qemu11-arm64-release.apk`.
 
-        # for x86 guest and ARM64 phone:
-        export BUILD_HOST=arm64-v8a
-        export BUILD_GUEST=x86_64-softmmu
-        make ndk-gdb PKG_NAME=com.limbo.emu.main
+Installing on a device:
 
-        # for other guests use respectively:
-        make ndk-gdb PKG_NAME=com.limbo.emu.main.arm
-		make ndk-gdb PKG_NAME=com.limbo.emu.main.sparc
-		make ndk-gdb PKG_NAME=com.limbo.emu.main.ppc
+    adb install -r build/limbo-x86-qemu11-arm64-release.apk
 
-        Note: you might want to disable signal handling in gdb:
-        handle all nostop noprint
+On MIUI, `adb install` is often rejected; use:
 
-        To catch a SIGSEGV:
-        handle 11 stop print
+    adb push build/limbo-x86-qemu11-arm64-release.apk /data/local/tmp/limbo.apk
+    adb shell pm install -r /data/local/tmp/limbo.apk
 
-        Useful commands:
-        To set breakpoints:       b <file.c>:<code_line>
-        To step statement:        s
-        To go to next statement:  n
-        To continue:              c
-        To halt(interrupt):       ctrl-c
-        To see stack (backtrace): bt
 
-===============================================================================
+10. What changed in the app (QEMU 11 integration)
+--------------------------------------------------------------------------------
 
-9. Development Notes
+  * `Config.java` / `VMExecutor` build QEMU command lines for 11.1.3 (46 CPU
+    models, invalid legacy CPU strings removed, `battery.dat` path fixed).
+  * SAF (`content://`) disks use QEMU's fdset: Java opens a `ParcelFileDescriptor`,
+    clears `FD_CLOEXEC`, passes `-add-fd fd=N,set=S` and QEMU gets
+    `file=/dev/fdset/S`.  `/proc/self/fd/N` does not work under scoped storage.
+  * `-kernel`/`-initrd` cannot use fdsets (QEMU uses fopen/mmap by path); the
+    files are copied into `cache/limbo/saf-*.bin` first.
+  * Running-VM media changes call `FileUtils.nativeAddFd` -> `limbo_fdset_add()`
+    in libqemu; QMP is not needed.
+  * Firmware/ROM assets are QEMU 11.1.x; `FileInstaller` validates their size
+    and CRC32 and refreshes them when the app's asset tag changes.  `.fd`
+    files are only size-checked because QEMU writes NVRAM variables into them.
+  * Only one `-pflash` may be attached (32- vs 64-bit UEFI); both together
+    exceed `vm.max_map_count` and cause Scudo OOM.
+  * Audio uses the new OpenSL ES/AAudio backends for both SDL and VNC display
+    modes, with microphone capture.
+  * Screen saver (DVD logo + immersive mode) and the special-keys bar are app
+    features, described in the changelog/memo.
+  * QEMU can only be initialised once per process; after stopping a VM the app
+    must be restarted before starting another one.
 
-    a. Codes Changes for Android compatibility are in patch files marked with __ANDROID__
 
-    b. Similarly for LIMBO functionality code changes are tagged with __LIMBO__
+11. Known issues
+--------------------------------------------------------------------------------
 
-    c. Important Configuration files (You'll need to update this with the NDK path before compiling):
-        limbo-android-lib/src/main/jni/android-config/android-limbo-config.mak
+  * virgl/OpenGL (MobileGL) is not wired up.
+  * Stop/start in the same process is not possible (`qemu_init` is one-shot).
+  * The RenderThread Scudo crash seen once during UI teardown was never
+    reproduced.
+  * `qemu-img` can create qcow2/raw/vmdk/vdi/vhdx/qed/vpc/parallels; bochs,
+    cloop and dmg can only be opened/converted, not created.
+  * OpenSL ES/AAudio are S16; the requested rate/channel count is downgraded
+    automatically if the device does not support it (mixeng resamples).
 
-    d. Advanced QEMU config files:
-        limbo-android-lib/src/main/jni/android-config/android-qemu-config.mak
 
-    d. Advanced Device Configuration files:
-        limbo-android-lib/src/main/jni/android-config/android-config/*.mak
+12. Debugging notes
+--------------------------------------------------------------------------------
 
-    e. Important Makefiles:
-        limbo-android-lib/src/main/jni/Makefile
-        limbo-android-lib/src/main/jni/Android.mk
-        limbo-android-lib/src/main/jni/Application.mk
-        limbo-android-lib/src/main/jni/android-limbo-build.mak
-        limbo-android-lib/src/main/jni/android-qemu-build.mak
+  * QEMU logs: `cache/limbo/qemu.log` inside the app data directory.
+  * `build/logs/` in the workspace holds the build logs.
+  * Device-side harness without installing the app: `build/tools/limbo-smoke`
+    is an arm64 binary that dlopen()s a QEMU .so and forwards its argv to
+    `qemu_init`.  Run it as the shell user from `/data/local/tmp` (SELinux
+    forbids executing binaries from the app's private directory) with the
+    app's lib directory in `LD_LIBRARY_PATH`.
+  * The emulator refuses to start if `libqemu-system-*.so` cannot be dlopen'ed:
+    check `DT_NEEDED` with `llvm-readelf -d` and make sure every dependency is
+    present in `jniLibs/arm64-v8a` under the packaged name.
+  * `zipalign -c -P 16 4 app.apk` must print "Verification successful".
 
-    f. Frontend UI options configuration see: Config.java
-    
-    g. When using git apply the following setting to your config file if you want to use 
-        return new lines for windows:
-    [core]
-        eol = true
-        autocrlf = input
-        fileMode = false
-        
-===============================================================================
-10. Run
 
-    a. Installing a full Qwerty keyboard for Android like Hacker's keyboard 
-        from the Google Android store. Make sure you use Transparent theme 
-        and Direct Draw found under Theme settings.
-    b. Start the Limbo app and choose CPU, Memory (~8-64MB),etc..
-    c. Choose a bootable disk image(s) for CDRom, Floppy, and a HDD image
-    d. Start the virtual machine.
-    e. For more instructions and guides visit: 
-        https://github.com/limboemu/limbo
-    f. Have fun!
+13. License
+--------------------------------------------------------------------------------
 
-===============================================================================
-10. Changelog
-See limbo-android-lib/src/main/assets/CHANGELOG for release notes
-
-===============================================================================
-11. License
-
-Limbo PC Emulator is released under GPL v2 License.
-All icons under /res are from Gnome Project (GPL v2 License)
-See file COPYING under root directory
-and LICENSE under limbo-android-lib/src/main/assets
-
-Other source included are released under their own license please view Licenses under each subdirectory
+Limbo PC Emulator is released under GPL v2.  Icons under `res/` are from the
+Gnome Project (GPL v2).  See COPYING.  QEMU, glib, pixman, SDL2, libffi,
+libslirp, zlib-ng, zstd, pcre2 and libiconv are under their own licenses
+(GPL/LGPL/BSD/zlib); sources are available from the upstream projects listed
+in §5.

@@ -1,0 +1,55 @@
+diff --git a/include/monitor/monitor.h b/include/monitor/monitor.h
+--- a/include/monitor/monitor.h
++++ b/include/monitor/monitor.h
+@@ -60,6 +60,9 @@
+ int monitor_read_password(MonitorHMP *mon, ReadLineFunc *readline_func,
+                           void *opaque);
+ 
++/* Limbo (Android): register an fd without a monitor (see monitor/fds.c). */
++int limbo_fdset_add(int fd, int fdset_id);
++
+ AddfdInfo *monitor_fdset_add_fd(int fd, bool has_fdset_id, int64_t fdset_id,
+                                 const char *opaque, Error **errp);
+ int monitor_fdset_dup_fd_add(int64_t fdset_id, int flags, Error **errp);
+diff --git a/monitor/fds.c b/monitor/fds.c
+--- a/monitor/fds.c
++++ b/monitor/fds.c
+@@ -513,3 +513,38 @@
+ {
+     qemu_mutex_init(&mon_fdsets_lock);
+ }
++
++/*
++ * Limbo (Android): libqemu-system-*.so is dlopen()ed inside the app process,
++ * so the UI can hand QEMU a descriptor without a monitor, a socket or
++ * SCM_RIGHTS. Used when removable media is changed while the VM runs
++ * ("-add-fd" only exists on the command line; QMP add-fd needs SCM_RIGHTS).
++ *
++ * The caller keeps its descriptor: we register a private duplicate, which
++ * QEMU closes with the rest of the set. Returns 0 on success, -1 on failure.
++ */
++int limbo_fdset_add(int fd, int fdset_id)
++{
++    AddfdInfo *info;
++    Error *err = NULL;
++    int dupfd;
++
++    if (fd < 0 || fdset_id < 0) {
++        return -1;
++    }
++
++    dupfd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
++    if (dupfd < 0) {
++        return -1;
++    }
++
++    info = monitor_fdset_add_fd(dupfd, true, fdset_id, "limbo", &err);
++    if (info == NULL) {
++        error_report_err(err);
++        close(dupfd);
++        return -1;
++    }
++    g_free(info);
++
++    return 0;
++}

@@ -54,6 +54,8 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.Toolbar;
 
 import com.limbo.emu.lib.R;
+import com.max2idea.android.limbo.ui.ScreenSaver;
+import com.max2idea.android.limbo.ui.SpecialKeysBar;
 import com.max2idea.android.limbo.files.FileUtils;
 import com.max2idea.android.limbo.help.Help;
 import com.max2idea.android.limbo.keyboard.KeyboardUtils;
@@ -82,6 +84,7 @@ public class LimboSDLActivity extends SDLActivity
         KeyMapManager.OnUnhandledTouchEventListener, MachineController.OnMachineStatusChangeListener,
         MachineController.OnEventListener {
     public static final int KEYBOARD = 10000;
+    private static final int REQUEST_RECORD_AUDIO = 10001;
     private static final String TAG = "LimboSDLActivity";
 
     public static boolean toggleKeyboardFlag = true;
@@ -103,11 +106,90 @@ public class LimboSDLActivity extends SDLActivity
     private KeyMapManager mKeyMapManager;
     private ViewListener viewListener;
     private boolean quit = false;
+    private static LimboSDLActivity sInstance;
+
+    /* LIMBO: called from MachineService when QEMU has exited, so that the
+     * SDL activity does not stay on screen waiting forever. */
+    public static void onVmStopped() {
+        LimboSDLActivity a = sInstance;
+        if (a != null) {
+            a.finishFromVmStop();
+        }
+    }
+
+    private void finishFromVmStop() {
+        quit = true;
+        synchronized (this) {
+            notifyAll();
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                finish();
+            }
+        });
+    }
     private View mGap;
     private boolean resettingLayout;
 
     public void showHints() {
         ToastUtils.toastShortTop(this, getString(R.string.PressVolumeDownForRightClick));
+    }
+
+    private ScreenSaver screenSaver;
+    private SpecialKeysBar specialKeysBar;
+
+    /**
+     * SDL view screen saver: after the configured idle time hide the toolbar
+     * and the system bars; any tap brings them back. The guest never sees the
+     * tap that dismisses it.
+     */
+    private void setupScreenSaver() {
+        screenSaver = new ScreenSaver(this, new ScreenSaver.Callbacks() {
+            @Override
+            public void onEnter() {
+                /* ActionBar.hide() leaves the Toolbar view in place (it only
+                 * blanks its content), which showed up as a grey 48px band at
+                 * the top; take the view out of the layout entirely. */
+                hideToolbarView(true);
+                ScreenSaver.setImmersive(LimboSDLActivity.this, true);
+                if (specialKeysBar != null) {
+                    specialKeysBar.setSuppressed(true);
+                }
+            }
+
+            @Override
+            public void onExit() {
+                ScreenSaver.setImmersive(LimboSDLActivity.this, false);
+                hideToolbarView(!LimboSettingsManager
+                        .getAlwaysShowMenuToolbar(LimboSDLActivity.this));
+                if (specialKeysBar != null) {
+                    specialKeysBar.setSuppressed(false);
+                }
+            }
+        });
+        screenSaver.setGate(new ScreenSaver.Gate() {
+            @Override
+            public boolean allow() {
+                /* Typing must never be interrupted by the screensaver: keys
+                 * would be swallowed on the way back out. */
+                return !KeyboardUtils.isKeyboardVisible()
+                        && !ScreenSaver.isImeVisible(LimboSDLActivity.this);
+            }
+        });
+        screenSaver.setTimeoutSeconds(LimboSettingsManager.getScreensaverTimeout(this));
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (screenSaver != null
+                && (ev.getActionMasked() == MotionEvent.ACTION_DOWN
+                    || ev.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN)
+                && screenSaver.onUserInput()) {
+            /* The tap that wakes the UI must not reach the guest. */
+            return true;
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     public void setupToolBar() {
@@ -177,6 +259,7 @@ public class LimboSDLActivity extends SDLActivity
     }
 
     public void onDestroy() {
+        SDLActivity.mOnKeySentListener = null;
         mNextNativeState = NativeState.PAUSED;
         mIsResumedCalled = false;
 
@@ -188,6 +271,9 @@ public class LimboSDLActivity extends SDLActivity
         SDLActivity.mSuspendOnly = true;
         removeListeners();
         quit = true;
+        if (sInstance == this) {
+            sInstance = null;
+        }
         super.onDestroy();
     }
 
@@ -225,8 +311,15 @@ public class LimboSDLActivity extends SDLActivity
                 @Override
                 public void run() {
                     toggleKeyboardFlag = KeyboardUtils.showKeyboard(LimboSDLActivity.this, toggleKeyboardFlag, mSurface);
+                    if (specialKeysBar != null) {
+                        specialKeysBar.setVisible(!toggleKeyboardFlag);
+                    }
                 }
             }, 500);
+        } else if (item.getItemId() == R.id.itemSpecialKeys) {
+            if (specialKeysBar != null) {
+                specialKeysBar.setVisible(!specialKeysBar.isVisible());
+            }
         } else if (item.getItemId() == R.id.itemMonitor) {
             if (monitorMode) {
                 showVMDisplay();
@@ -285,6 +378,19 @@ public class LimboSDLActivity extends SDLActivity
             }
         });
         alertDialog.show();
+    }
+
+    private void hideToolbarView(boolean hide) {
+        Toolbar tb = findViewById(R.id.toolbar);
+        if (tb != null) {
+            /* INVISIBLE, not GONE: removing the view from the layout makes the
+             * SDL surface grow and the guest zoom in (and crop). Keeping the
+             * space means the guest stays exactly where it was; the toolbar
+             * area just shows the black window background. */
+            tb.setVisibility(hide ? View.INVISIBLE : View.VISIBLE);
+        }
+        /* Do not call ActionBar.hide(): AppCompat turns that into GONE on the
+         * same Toolbar, which collapses the layout and resizes the guest. */
     }
 
     public void hideToolbar() {
@@ -443,6 +549,9 @@ public class LimboSDLActivity extends SDLActivity
     // grave and send it as text
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (screenSaver != null && screenSaver.onUserInput()) {
+            return true;
+        }
         if (event.getAction() == KeyEvent.ACTION_MULTIPLE && event.getKeyCode() == KeyEvent.KEYCODE_UNKNOWN) {
             sendText(event.getCharacters());
             return true;
@@ -482,19 +591,41 @@ public class LimboSDLActivity extends SDLActivity
     }
 
     protected void onCreate(Bundle savedInstanceState) {
+        /* The window keeps a status-bar/cutout strip above the content even
+         * with the bars hidden; make it black so the screensaver is seamless
+         * (the guest surface itself is left untouched, resizing it crops). */
+        getWindow().setBackgroundDrawable(
+                new android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK));
         setupScreen();
         saveAudioState();
         super.onCreate(savedInstanceState);
         mSingleton = this;
+        sInstance = this;
         restoreAudioState();
+        requestRecordAudioPermission();
         setupWidgets();
         setupListeners();
         setupToolBar();
+        setupScreenSaver();
         showHints();
         ScreenUtils.updateOrientation(this, -1);
         checkPendingActions();
         setupUserInterface();
         setupAudio();
+    }
+
+    /* LIMBO: the OpenSL ES / AAudio QEMU backends open the microphone when the
+     * guest driver starts capture, which needs a runtime grant on Android 6+. */
+    private void requestRecordAudioPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return;
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{android.Manifest.permission.RECORD_AUDIO},
+                    REQUEST_RECORD_AUDIO);
+        }
     }
 
     private void setupUserInterface() {
@@ -547,6 +678,64 @@ public class LimboSDLActivity extends SDLActivity
         mGap = (View) findViewById(R.id.gap);
         updateLayout(getResources().getConfiguration().orientation);
 
+        /* LIMBO: SDL only learns its surface size from surfaceChanged().  The
+         * first layout pass sometimes lands after SDL has already created its
+         * window, which leaves the guest scaled for the wrong geometry (the
+         * right edge gets cut).  Force a fit once the activity is up, and
+         * again whenever the container really changes size. */
+        mLayout.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                                       int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                    forceSurfaceFit();
+                }
+            }
+        });
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        forceSurfaceFit();
+                    }
+                }, 1200);
+
+        /* Special keys strip (Ctrl/Alt/Tab/F1-F12/arrows...): it follows the
+         * software keyboard and sits right above it. */
+        SDLActivity.mOnKeySentListener = new SDLActivity.OnKeySentListener() {
+            @Override
+            public void onKeySent(int keyCode) {
+                if (specialKeysBar != null) {
+                    specialKeysBar.onKeySent(keyCode);
+                }
+            }
+        };
+        specialKeysBar = SpecialKeysBar.attach(this, new SpecialKeysBar.Sender() {
+            @Override
+            public void send(int[] keyCodes) {
+                sendKeys(keyCodes, Math.max(30, Config.keyDelay));
+            }
+
+            @Override
+            public boolean setHeld(int keyCode, boolean down) {
+                /* Real key-down/up: the modifier stays pressed in the guest so
+                 * the next key from the soft keyboard combines with it. */
+                sendKeyEvent(null, keyCode, down);
+                return true;
+            }
+        });
+    }
+
+    /** Re-derive the SDL surface buffer size from the current layout. */
+    private void forceSurfaceFit() {
+        if (mSurface == null) {
+            return;
+        }
+        try {
+            mSurface.getHolder().setSizeFromLayout();
+        } catch (Exception e) {
+            Log.w(TAG, "surface fit failed: " + e);
+        }
     }
 
     private void setupKeyMapManager() {
@@ -574,10 +763,16 @@ public class LimboSDLActivity extends SDLActivity
     }
 
     protected void onPause() {
+        if (specialKeysBar != null) {
+            specialKeysBar.releaseModifiers();
+        }
         if (MachineController.getInstance().isRunning())
             notifyAction(MachineAction.UPDATE_NOTIFICATION,
                     getString(R.string.VMSuspended));
         super.onPause();
+        if (screenSaver != null) {
+            screenSaver.end();
+        }
     }
 
     public void promptVolume() {
@@ -636,6 +831,9 @@ public class LimboSDLActivity extends SDLActivity
             notifyAction(MachineAction.UPDATE_NOTIFICATION,
                     getString(R.string.VMRunning));
         super.onResume();
+        if (screenSaver != null) {
+            screenSaver.begin();
+        }
     }
 
     public void loadLibraries() {
@@ -1062,9 +1260,12 @@ public class LimboSDLActivity extends SDLActivity
                     delay(delayMs);
 //                Log.d(TAG, "sendKeyEvent: " + ", keycode = " + keycode + ", down = " + down
 //                + ", delay = " + delayMs);
-                if (down)
+                if (down) {
                     SDLActivity.onNativeKeyDown(keycode);
-                else {
+                    if (specialKeysBar != null) {
+                        specialKeysBar.onKeySent(keycode);
+                    }
+                } else {
                     SDLActivity.onNativeKeyUp(keycode);
                 }
             }

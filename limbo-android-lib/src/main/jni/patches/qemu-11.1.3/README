@@ -1,0 +1,76 @@
+QEMU 11.1.3 Android/Limbo patch series
+======================================
+
+Apply to a pristine qemu-11.1.3 tree, in numerical order:
+
+    cd jni/qemu
+    for p in ../patches/qemu-11.1.3/*.patch; do patch -p1 < "$p"; done
+
+`make prepare` does this automatically and skips already-patched trees.
+
+The series is split by topic so it can be reviewed and carried forward
+individually.  All Limbo-specific hooks are guarded by `__LIMBO__`; Android
+compatibility changes use `__ANDROID__` where possible.
+
+0001-android-build-meson.patch
+    Build system for bionic/Android.
+    - meson.build: librt is optional (bionic has no separate librt),
+      never probe X11, drop the signalfd test, disable ivshmem
+      (CONFIG_EVENTFD only), ...
+    - util/meson.build: add util/limbo-openpty.c (API 21 has no openpty).
+    - system/main.c: define SDL_MAIN_HANDLED so SDL does not rename main().
+
+0002-android-libc-compat.patch
+    Interfaces bionic lacks or implements differently.
+    - block.c: /tmp and /var/tmp do not exist; use the app cache directory.
+    - block/file-posix.c: bionic headers define STATX_DIOALIGN but the value
+      is not usable at API 21.
+    - chardev/char-pty.c: declare openpty() for API < 23.
+    - common-user/mmap-min-addr.c: 8 pages minimum (Termux #6172).
+    - fsdev/9p-marshal.h: st_*_nsec macros collide with the 9p fields.
+    - hw/9pfs/9p-local.c: bionic has no telldir()/seekdir(); use lseek().
+    - audio/ossaudio.c: headers live in <linux/soundcard.h>.
+    - util/drm.c: no <glob.h>.
+    - util/oslib-posix.c: shm_open()/shm_unlink() emulation using files in
+      $TMPDIR (or the app cache directory).
+    - util/limbo-openpty.c: minimal openpty().
+
+0003-limbo-ui-hooks.patch
+    Hooks the Android frontend drives through dlsym().
+    - hw/display/vga.c: limbo_vga_full_update forces a full repaint.
+    - include/ui/console.h + ui/console.c: runtime-tunable
+      gui_refresh_interval_default/idle.
+    - ui/vnc.c: runtime-tunable VNC refresh pacing.
+    - ui/sdl2.c: limbo_sdl_scale_hint (linear scaling), selectable
+      software/hardware renderer.
+    - ui/sdl2-2d.c: call the weak Android_JNI_SetVMResolution() when the
+      guest resolution changes.
+
+0004-android-audio-backends.patch
+    Native Android audio.
+    - audio/openslesaudio.c: OpenSL ES output + capture (API 21+).
+    - audio/aaudioaudio.c: AAudio output + capture, loaded with
+      dlopen("libaaudio.so") because AAudio only exists on API 26+.
+    - qapi/audio.json, audio/audio.c, audio/audio_template.h,
+      audio/meson.build, meson.build, meson_options.txt: wire both drivers
+      into the audio subsystem (all three dispatch points must be updated:
+      audio_create_pdos, audio_get_pdo_out/in and the same functions in
+      audio_template.h, otherwise QEMU aborts).
+
+0005-qemu-img-inprocess.patch
+    limbo_img_create(): create an image with bdrv_create() without entering
+    qemu-img's main()/exit() paths.  Used by libqemu-img.so / the JNI layer.
+
+0006-fdset-hotplug.patch
+    limbo_fdset_add(): register an fd in a QEMU fdset without a monitor or
+    SCM_RIGHTS.  Needed to change removable media while the VM runs; QMP's
+    add-fd cannot be used because the Java socket client cannot send fds.
+
+Notes
+-----
+* Applying the series to a clean tarball must reproduce the working tree
+  bit-for-bit.  If you change jni/qemu, regenerate the corresponding patch
+  (see README.developers §6) and re-verify.
+* The patches are against qemu-11.1.3.tar.xz (sha256 in ../README).
+* patches/setjmp-aarch64/ is separate: it is linked into the QEMU .so by
+  scripts/link-qemu-so.py, not applied to the source.

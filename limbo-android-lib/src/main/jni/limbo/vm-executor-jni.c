@@ -219,6 +219,18 @@ JNIEXPORT jstring JNICALL Java_com_max2idea_android_limbo_jni_VMExecutor_start(
 	setup_jni(env, thiz, storage_dir, base_dir);
     set_qemu_var(env, thiz, "limbo_sdl_scale_hint", sdl_scale_hint);
 
+    /* LIMBO: QEMU runs in-process here, so its stdout/stderr would otherwise
+     * disappear.  Keep them in the app cache directory so startup failures
+     * (bad -L path, unsupported CPU flags, SDL errors, ...) are diagnosable. */
+    {
+        FILE *qemu_log = freopen(
+                "/data/data/com.limbo.emu.dontknowhy/cache/qemu.log", "w", stdout);
+        if (qemu_log) {
+            setvbuf(qemu_log, NULL, _IONBF, 0);
+            dup2(fileno(qemu_log), fileno(stderr));
+        }
+    }
+
 	typedef void (*main_t)(int argc, char **argv, char **envp);
     typedef void (*qemu_main_loop_t)();
 	typedef void (*qemu_cleanup_t)();
@@ -317,3 +329,51 @@ JNIEXPORT jstring JNICALL Java_com_max2idea_android_limbo_jni_VMExecutor_stop(
 
 // JNI End
 
+
+typedef int (*limbo_img_create_t)(const char *filename, const char *fmt,
+                                  long long size, const char *options,
+                                  char *errbuf, size_t errlen);
+
+JNIEXPORT jstring JNICALL
+Java_com_max2idea_android_limbo_jni_VMExecutor_nativeCreateImage(
+        JNIEnv *env, jobject thiz, jstring jpath, jstring jfmt, jlong jsize,
+        jstring jopts)
+{
+    static void *img_handle;
+    static limbo_img_create_t img_create;
+    char errbuf[MSG_BUFSIZE];
+    const char *path;
+    const char *fmt;
+    const char *opts = NULL;
+    int ret;
+
+    if (!img_handle) {
+        img_handle = dlopen("libqemu-img.so", RTLD_NOW | RTLD_LOCAL);
+        if (!img_handle) {
+            const char *e = dlerror();
+            return (*env)->NewStringUTF(env, e ? e : "cannot load libqemu-img.so");
+        }
+        img_create = (limbo_img_create_t)dlsym(img_handle, "limbo_img_create");
+        if (!img_create) {
+            return (*env)->NewStringUTF(env, "limbo_img_create not found");
+        }
+    }
+
+    path = (*env)->GetStringUTFChars(env, jpath, NULL);
+    fmt = (*env)->GetStringUTFChars(env, jfmt, NULL);
+    if (jopts) {
+        opts = (*env)->GetStringUTFChars(env, jopts, NULL);
+    }
+    errbuf[0] = '\0';
+    ret = img_create(path, fmt, (long long)jsize, opts, errbuf, sizeof(errbuf));
+    (*env)->ReleaseStringUTFChars(env, jpath, path);
+    (*env)->ReleaseStringUTFChars(env, jfmt, fmt);
+    if (opts) {
+        (*env)->ReleaseStringUTFChars(env, jopts, opts);
+    }
+
+    if (ret == 0) {
+        return NULL;
+    }
+    return (*env)->NewStringUTF(env, errbuf[0] ? errbuf : "image creation failed");
+}
