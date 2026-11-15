@@ -139,8 +139,11 @@ optimisation; only `-polly-parallel` is off the table because it pulls in
 libomp, which this project does not ship.  A Polly build
 (`-mllvm -polly -polly-vectorizer=stripmine -polly-invariant-load-hoisting
 -polly-run-inliner -polly-run-dce -polly-detect-keep-going
--polly-ast-use-context`) configures and links fine; benchmark it with
-`scripts/serial-bench.py` before adopting it.
+-polly-ast-use-context`) configures and links fine, but measured **no gain**:
+10 runs each of the dd|md5 benchmark gave baseline min 5.66 s / median 5.69 s
+vs Polly min 5.68 s / median 5.72 s, i.e. within noise (TCG is a large switch
+over computed gotos, not affine loop nests).  `.text` shrank only 1.3%.  It is
+therefore not enabled.
 
 
 5. Source tarballs (`deps/`)
