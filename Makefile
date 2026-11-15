@@ -40,6 +40,20 @@ KEYSTORE_PROPERTIES ?= $(APP_ROOT)/keystore/keystore.properties
 STAMPS      := $(BUILD)/.stamps
 QEMU_BUILD  ?= $(BUILD)/qemu-build
 
+# Profile-guided optimisation.  The checked-in profile was trained on the
+# TCG/softmmu hot paths of a multi-image workload (see README "PGO"); the
+# compiler still targets generic armv8-a, so one build serves every device.
+# Build without it with `make PGO_PROFILE=`.
+PGO_PROFILE ?= $(APP_ROOT)/profiles/qemu-11.1.3.profdata
+ifneq ($(strip $(PGO_PROFILE)),)
+ifeq ($(wildcard $(PGO_PROFILE)),)
+$(error PGO_PROFILE=$(PGO_PROFILE) does not exist; pass PGO_PROFILE= to disable PGO)
+endif
+PGO_FLAGS := -fprofile-use=$(PGO_PROFILE) -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date
+else
+PGO_FLAGS :=
+endif
+
 # One shell environment for every recipe.
 ENV = source "$(APP_ROOT)/scripts/env.sh"
 
@@ -294,17 +308,25 @@ qemu-configure: $(STAMPS)/qemu-configured
 $(STAMPS)/qemu-configured: $(STAMPS)/zlib $(STAMPS)/zstd $(STAMPS)/glib \
                 $(STAMPS)/pixman $(STAMPS)/slirp $(STAMPS)/sdl2 \
                 $(STAMPS)/iconv $(STAMPS)/ffi $(STAMPS)/prepare-qemu \
-                $(APP_ROOT)/scripts/qemu-configure.sh
-	@$(ENV); "$(APP_ROOT)/scripts/qemu-configure.sh"
+                $(APP_ROOT)/scripts/qemu-configure.sh $(PGO_PROFILE)
+	@$(ENV); EXTRA_CFLAGS="$(PGO_FLAGS) $${EXTRA_CFLAGS:-}" \
+	    "$(APP_ROOT)/scripts/qemu-configure.sh"
 	@mkdir -p "$(STAMPS)"; touch $@
 
 qemu: $(STAMPS)/qemu-configured $(BUILD)/setjmp/libandroid-setjmp.a liblimbo
+	@if [ ! -f "$(QEMU_BUILD)/build.ninja" ]; then \
+	    echo "== $@: $(QEMU_BUILD) is missing, reconfiguring =="; \
+	    rm -f "$(STAMPS)/qemu-configured"; \
+	    $(MAKE) --no-print-directory "$(STAMPS)/qemu-configured"; \
+	fi
 	@$(ENV); $$NINJA -C "$(QEMU_BUILD)" qemu-system-x86_64 qemu-img
 	@echo "== relink libqemu-system-x86_64.so =="
-	@$(ENV); python3 "$(APP_ROOT)/scripts/link-qemu-so.py" \
+	@$(ENV); EXTRA_LDFLAGS="$(PGO_FLAGS) $${EXTRA_LDFLAGS:-}" \
+	    python3 "$(APP_ROOT)/scripts/link-qemu-so.py" \
 	    "$(QEMU_BUILD)" qemu-system-x86_64 libqemu-system-x86_64.so
 	@echo "== relink libqemu-img.so =="
-	@$(ENV); python3 "$(APP_ROOT)/scripts/link-qemu-so.py" \
+	@$(ENV); EXTRA_LDFLAGS="$(PGO_FLAGS) $${EXTRA_LDFLAGS:-}" \
+	    python3 "$(APP_ROOT)/scripts/link-qemu-so.py" \
 	    "$(QEMU_BUILD)" qemu-img libqemu-img.so
 	@mkdir -p "$(JLIB)"
 	@mv -f "$(QEMU_BUILD)/libqemu-system-x86_64.so" "$(JLIB)/"
@@ -356,6 +378,7 @@ clean:
 
 clean-qemu:
 	@rm -rf "$(QEMU_BUILD)" "$(BUILD)/native-build"
+	@rm -f "$(STAMPS)/qemu-configured"
 
 clean-jnilibs:
 	@rm -rf "$(JLIB)"

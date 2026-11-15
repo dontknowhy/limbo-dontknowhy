@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Drive a QEMU serial console over adb for the dd|md5 benchmark.
 
-    scripts/serial-bench.py <libqemu.so on device> <tag> [iterations] [log]
+    scripts/serial-bench.py <libqemu.so on device> <tag> [iterations] [log] [extra qemu args]
+
+`extra qemu args` are appended to the QEMU command line (e.g.
+``"-accel tcg,thread=single"``) so build/runtime knobs can be compared without
+touching the library.  `BENCH_CMD="..."` overrides the guest workload
+(default: `dd if=/dev/zero bs=1M count=256 | md5sum`).
 
 Waits for the guest login prompt instead of sleeping, so slow boots do not
 desynchronise the input.  Requires the usual test setup on the device:
 
     /data/local/tmp/bt/{vmlinuz-virt,initramfs-virt,alpine.iso}
     /data/local/tmp/bt/libs/*.so           (jniLibs, all DT_NEEDED names)
+                                           override with $BENCH_LIBDIR
     /data/local/tmp/limbo-smoke            (build/tools/limbo-smoke)
     /data/local/tmp/bt/<libqemu.so>        the library under test
 
@@ -25,6 +31,9 @@ lib = sys.argv[1]
 tag = sys.argv[2]
 iters = sys.argv[3] if len(sys.argv) > 3 else "4"
 logpath = sys.argv[4] if len(sys.argv) > 4 else f"/tmp/opencode/bench-{tag}.log"
+extra = shlex.split(sys.argv[5]) if len(sys.argv) > 5 else []
+libdir = os.environ.get("BENCH_LIBDIR", "/data/local/tmp/bt/libs")
+smoke = os.environ.get("BENCH_SMOKE", "/data/local/tmp/limbo-smoke")
 
 qemu = [
     "-m", "256", "-M", "pc", "-nodefaults", "-L", "/data/local/tmp/bt",
@@ -33,9 +42,10 @@ qemu = [
     "-drive", "file=alpine.iso,if=ide,media=cdrom,readonly=on",
     "-display", "none", "-serial", "stdio", "-monitor", "none",
 ]
+qemu = qemu + extra
 remote = ("cd /data/local/tmp/bt && "
-          "LD_LIBRARY_PATH=/data/local/tmp/bt/libs "
-          "taskset 40 /data/local/tmp/limbo-smoke " + shlex.quote(lib) + " " +
+          f"LD_LIBRARY_PATH={shlex.quote(libdir)} "
+          f"taskset 40 {shlex.quote(smoke)} " + shlex.quote(lib) + " " +
           " ".join(shlex.quote(a) for a in qemu))
 cmd = ["adb", "shell", remote]
 
@@ -44,13 +54,17 @@ p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
 buf = b""
 log = open(logpath, "wb")
 sent_login = sent_bench = sent_power = False
-deadline = time.time() + 300
+start = time.time()
+boot_time = None
+deadline = start + 300
 
 nums = " ".join(str(i) for i in range(1, int(iters) + 1))
+workload = os.environ.get(
+    "BENCH_CMD", "dd if=/dev/zero bs=1M count=256 2>/dev/null | md5sum")
 bench = (
     f"for i in {nums}; do "
     "t=$(cut -d' ' -f1 /proc/uptime); "
-    "dd if=/dev/zero bs=1M count=256 2>/dev/null | md5sum; "
+    f"{workload}; "
     "t2=$(cut -d' ' -f1 /proc/uptime); "
     f"echo BENCH {tag} $i $t $t2; "
     "done; echo BENCH_DONE"
@@ -66,6 +80,9 @@ while time.time() < deadline:
         log.flush()
         buf += chunk
     if not sent_login and b"login:" in buf:
+        boot_time = time.time() - start
+        log.write(f"BOOT {tag} {boot_time:.2f}\n".encode())
+        log.flush()
         p.stdin.write(b"root\n")
         p.stdin.flush()
         sent_login = True
@@ -89,4 +106,7 @@ try:
 except Exception:
     pass
 log.close()
-print("done", logpath)
+if boot_time is not None:
+    print(f"done {logpath} boot={boot_time:.2f}s")
+else:
+    print("done", logpath, "(no login prompt seen)")

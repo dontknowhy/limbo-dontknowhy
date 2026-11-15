@@ -281,6 +281,74 @@ switches are listed at the top of `scripts/qemu-configure.sh`; notable ones:
 `coroutine_backend=sigaltstack` is required: bionic has no ucontext and the
 sigaltstack backend is the one that works with the setjmp replacement.
 
+### PGO (on by default)
+
+`profiles/qemu-11.1.3.profdata` is an IR (instrumented) profile trained on the
+TCG/softmmu hot paths of five different guests (Win11PE, Win7Lite, Ubuntu 14.04,
+a Win10 VMDK, 微PE x64) plus an Alpine boot/`dd|md5` run.  `make` feeds it to
+both the compiler and the LTO link, because with full LTO the optimisation
+happens at link time:
+
+    -fprofile-use=profiles/qemu-11.1.3.profdata
+
+Measured on a Xiaomi 2410DPN6CC (`taskset 40`, Alpine 3.24, 256 MB
+`dd if=/dev/zero bs=1M count=256 | md5sum`, 9 runs each):
+
+| build | min | median | `.text` | `.so` |
+|---|---|---|---|---|
+| no PGO | 5.68 s | 5.71 s | 9.87 MB | 34.94 MB |
+| PGO (Alpine only) | 5.47 s | 5.51 s | 5.94 MB | 30.94 MB |
+| **PGO (five images)** | **5.48 s** | **5.52 s** | **5.92 MB** | **30.88 MB** |
+| AutoFDO (sample PGO) | 5.81 s | 5.83 s | 10.11 MB | 35.14 MB |
+
+The multi-workload profile matches the single-workload one, so the gain comes
+from QEMU's generic translation/softmmu code rather than from tuning for one
+guest.  Hot/cold splitting is what shrinks `.text` by 40%.  The compiler still
+targets `-march=armv8-a+simd+crc+crypto`, so the same APK runs on every arm64
+device.
+
+Sample-based AutoFDO was tried and rejected: this device cannot record branch
+stacks, and line-frequency-only profiles made clang inline too aggressively
+(+2.1% run time).  Polly, LSE and per-SoC `-mcpu` were measured too; all were
+noise or slower.
+
+Build without the profile with `make PGO_PROFILE= …` (e.g. for a bisect).  The
+profile must be regenerated whenever the QEMU sources change:
+
+    export BUILD=$PWD/build PREFIX=$PWD/../prebuilt/arm64-v8a
+    QEMU_BUILD=$BUILD/qemu-build-pgo \
+    EXTRA_CFLAGS="-fprofile-generate=/data/local/tmp/pgo" \
+        scripts/qemu-configure.sh -Db_pgo=generate
+    ninja -C $BUILD/qemu-build-pgo qemu-system-x86_64
+    python3 scripts/link-qemu-so.py $BUILD/qemu-build-pgo \
+        qemu-system-x86_64 libqemu-pgogen.so
+    scripts/fix-needed.sh libqemu-pgogen.so
+    # push libqemu-pgogen.so + jniLibs to the device, boot each guest for ~30 s,
+    # pull /data/local/tmp/pgo/*.profraw, then:
+    llvm-profdata merge -o profiles/qemu-11.1.3.profdata *.profraw
+
+`-Db_pgo=generate` is needed (not just the `-fprofile-generate` cflag) so that
+meson links the profiling runtime into the binaries it builds.
+
+**Train in a sibling of the release build directory.**  LLVM names functions
+with internal linkage `<source-path>;<function>`, and meson compiles with paths
+relative to the build directory.  A profile trained in `build/fresh/qemu-build-pgo`
+(`../../../limbo-dontknowhy/...`) only matched the global symbols of a build in
+`build/qemu-build` (`../../limbo-dontknowhy/...`): `.text` came out at 6.77 MB
+instead of 5.92 MB and the result was ~1.5% slower.  If the training tree has a
+different depth, rewrite the keys before merging:
+
+    llvm-profdata merge --text profiles/qemu-11.1.3.profdata -o pgo.proftext
+    sed 's#^\.\./\.\./\.\./limbo-dontknowhy/#../../limbo-dontknowhy/#' \
+        pgo.proftext > pgo-fixed.proftext
+    llvm-profdata merge pgo-fixed.proftext -o profiles/qemu-11.1.3.profdata
+
+The checked-in profile is written for the default layout (`build/qemu-build`
+under the repository root).  Building with `BUILD=` pointing somewhere else
+still applies the profile to external-linkage functions, but static functions
+fall back to their unprofiled behaviour.
+
+
 
 8. Relinking and DT_NEEDED
 --------------------------------------------------------------------------------

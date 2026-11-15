@@ -89,6 +89,10 @@ if target.startswith("qemu-system"):
     # DT_NEEDED set, not the caller's. Force the DT_NEEDED entry.
     args += ["-Wl,--no-as-needed", "-llimbo", "-Wl,--as-needed"]
 
+# Optional extra link flags (experiments, e.g. "-Wl,--lto-O3 -Wl,--icf=all").
+extra_ldflags = shlex.split(os.environ.get("EXTRA_LDFLAGS", ""))
+args += extra_ldflags
+
 cc = os.environ.get("CC")
 if not cc:
     sys.exit("error: CC is not set; source scripts/env.sh first")
