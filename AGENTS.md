@@ -107,8 +107,8 @@ make distclean       # 连 native build 与 jniLibs 一起删
   不要把宿主路径加回来。
 - **PGO profile 的键带相对源码路径**。`prepare-pgo-profile.sh` 会按当前
   `QEMU_BUILD→QEMU_SRC` 重写；移动工作区后删 `../build/qemu-pgo.profdata` 让它重生成。
-- QEMU 日志固定写到 `/data/data/com.limbo.emu.dontknowhy/cache/qemu.log`
-  （`vm-executor-jni.c` 里硬编码）。
+- QEMU 日志写到 `base_dir/qemu.log`，即 `cache/limbo/qemu.log`（`base_dir` 由
+  `VMExecutor.start()` 从 `LimboApplication.getBasefileDir()` 传入，不写死包名）。
 - `libcompat-limbo.so` 已不存在；`set_jni`、`Android_JNI_SetVMResolution`、
   `FileUtils.nativeAddFd` 都在 `liblimbo.so`。不要再拆出第二个 compat 库。
 - 不要引入需要运行时依赖的库（libunwind/libomp/mimalloc 等），也不要用

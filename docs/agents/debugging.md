@@ -5,20 +5,16 @@ QEMU 跑在 App 进程内，没有独立进程可 attach；所有问题先从日
 
 ## 日志
 
-- QEMU 的 stdout/stderr 被 JNI 重定向到固定路径：
-
-  ```
-  /data/data/com.limbo.emu.dontknowhy/cache/qemu.log
-  ```
-
-  路径硬编码在 `limbo-android-lib/src/main/jni/limbo/vm-executor-jni.c`（`freopen`），
-  不是 `cache/limbo/qemu.log`（README 的写法不准确）。每次启动以 `"w"` 截断。
+- QEMU 的 stdout/stderr 被 JNI 重定向到 `base_dir` 下的 `qemu.log`，即
+  `cache/limbo/qemu.log`（`limbo-android-lib/src/main/jni/limbo/vm-executor-jni.c`，
+  路径由 `VMExecutor.start()` 传入的 `base_dir` 拼出，不写死包名）。每次启动以
+  `"w"` 截断。
 - 取日志：
 
   ```bash
-  adb shell run-as com.limbo.emu.dontknowhy cat cache/qemu.log
+  adb shell run-as com.limbo.emu.dontknowhy cat cache/limbo/qemu.log
   # release 包不可 run-as 时：
-  adb shell su -c 'cat /data/data/com.limbo.emu.dontknowhy/cache/qemu.log'
+  adb shell su -c 'cat /data/data/com.limbo.emu.dontknowhy/cache/limbo/qemu.log'
   ```
 
 - Java 侧看 logcat（limbo 的 tag 以 `Limbo`/`VMExecutor` 为主，直接过滤 PID）：

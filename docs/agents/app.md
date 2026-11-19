@@ -25,7 +25,7 @@ LimboEmuActivity (extends LimboActivity)
 
 QEMU runs **in the app process**. `VMExecutor.start()` calls the native `start()` with
 `(Config.storagedir, basefileDir, libName, libPath, SDLHintScale, params)`. The JNI side
-redirects stdout/stderr to `/data/data/com.limbo.emu.dontknowhy/cache/qemu.log`.
+redirects stdout/stderr to `<basefileDir>/qemu.log` (`cache/limbo/qemu.log`).
 
 `stop(restart)` either calls `qemu_system_reset_request()` (restart) or
 `qemu_system_shutdown_request()` (stop). `MachineService` clears `limboThread` and calls

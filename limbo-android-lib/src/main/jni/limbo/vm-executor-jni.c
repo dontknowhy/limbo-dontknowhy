@@ -52,6 +52,30 @@ void * loadLib(const char* lib_filename, const char * lib_path_str) {
 
 }
 
+/* QEMU runs in-process, so its stdout/stderr would otherwise disappear.
+ * Keep them next to the other runtime files; base_dir is the app's
+ * cache/limbo directory, so this also works for secondary users and forks
+ * instead of hardcoding /data/data/<package>. */
+static void redirect_qemu_log(const char *base_dir) {
+    char path[MAX_STRING_LEN];
+    size_t len;
+
+    if (base_dir == NULL || base_dir[0] == '\0')
+        return;
+
+    len = strlen(base_dir);
+    snprintf(path, sizeof(path), "%s%s%s", base_dir,
+             base_dir[len - 1] == '/' ? "" : "/", "qemu.log");
+
+    FILE *qemu_log = freopen(path, "w", stdout);
+    if (qemu_log) {
+        setvbuf(qemu_log, NULL, _IONBF, 0);
+        dup2(fileno(qemu_log), fileno(stderr));
+    } else {
+        LOGE("Cannot open QEMU log %s: %s", path, strerror(errno));
+    }
+}
+
 void setup_jni(JNIEnv* env, jobject thiz, jstring storage_dir, jstring base_dir) {
 
     const char *base_dir_str = NULL;
@@ -63,8 +87,16 @@ void setup_jni(JNIEnv* env, jobject thiz, jstring storage_dir, jstring base_dir)
     if (storage_dir != NULL)
 		storage_dir_str = (*env)->GetStringUTFChars(env, storage_dir, 0);
 
+    /* Must happen before qemu_init(). */
+    redirect_qemu_log(base_dir_str);
+
 	jclass c = (*env)->GetObjectClass(env, thiz);
 	set_jni(env, thiz, c, storage_dir_str, base_dir_str);
+
+    if (storage_dir_str != NULL)
+		(*env)->ReleaseStringUTFChars(env, storage_dir, storage_dir_str);
+    if (base_dir_str != NULL)
+		(*env)->ReleaseStringUTFChars(env, base_dir, base_dir_str);
 }
 
 int get_qemu_var(JNIEnv* env, jobject thiz, const char * var) {
@@ -218,18 +250,6 @@ JNIEXPORT jstring JNICALL Java_com_max2idea_android_limbo_jni_VMExecutor_start(
 
 	setup_jni(env, thiz, storage_dir, base_dir);
     set_qemu_var(env, thiz, "limbo_sdl_scale_hint", sdl_scale_hint);
-
-    /* LIMBO: QEMU runs in-process here, so its stdout/stderr would otherwise
-     * disappear.  Keep them in the app cache directory so startup failures
-     * (bad -L path, unsupported CPU flags, SDL errors, ...) are diagnosable. */
-    {
-        FILE *qemu_log = freopen(
-                "/data/data/com.limbo.emu.dontknowhy/cache/qemu.log", "w", stdout);
-        if (qemu_log) {
-            setvbuf(qemu_log, NULL, _IONBF, 0);
-            dup2(fileno(qemu_log), fileno(stderr));
-        }
-    }
 
 	typedef void (*main_t)(int argc, char **argv, char **envp);
     typedef void (*qemu_main_loop_t)();
