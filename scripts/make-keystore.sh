@@ -3,19 +3,21 @@
 #
 #   scripts/make-keystore.sh
 #
-# The generated keystore is a *demo* key: it is published in this repository
-# so that every build of this fork can upgrade the previous one.  Do not reuse
-# it for anything you care about.  Delete the files and run this script again
-# to get a private key (pre-existing installs then need a reinstall).
+# The generated keystore is a *demo* key used for this fork's release APKs.
+# It lives outside the git checkout (default: $LIMBO_ROOT/keystore) so the
+# signing material is never committed.  Override KEYSTORE_DIR/KEYSTORE/
+# KEYSTORE_PROPERTIES for a private key.  Do not reuse the demo key for
+# anything you care about; replacing it means pre-existing installs must be
+# uninstalled first (signature mismatch).
 set -euo pipefail
 
 APP_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=/dev/null
 source "$APP_ROOT/scripts/env.sh"
 
-KS_DIR=$APP_ROOT/keystore
-KS=$KS_DIR/limbo-release.jks
-PROPS=$KS_DIR/keystore.properties
+KS_DIR=${KEYSTORE_DIR:-$LIMBO_ROOT/keystore}
+KS=${KEYSTORE:-$KS_DIR/limbo-release.jks}
+PROPS=${KEYSTORE_PROPERTIES:-$KS_DIR/keystore.properties}
 ALIAS=limbo
 PASS=limbo-release
 

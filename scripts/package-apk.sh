@@ -54,13 +54,14 @@ else
     ALIGNED=$BUILD/limbo-x86-qemu11-arm64-release-aligned.apk
     "$BUILD_TOOLS/zipalign" -P 16 -f 4 "$UNSIGNED" "$ALIGNED"
 
-    # Sign (v1+v2+v3) with the fork's published demo key.
+    # Sign (v1+v2+v3) with the fork's demo key (workspace keystore/, outside
+    # the git checkout).
     OUT=$BUILD/limbo-x86-qemu11-arm64-release.apk
     (
         # shellcheck source=/dev/null
-        source "$APP_ROOT/keystore/keystore.properties"
+        source "$KEYSTORE_PROPERTIES"
         "$BUILD_TOOLS/apksigner" sign \
-            --ks "$APP_ROOT/keystore/$storeFile" \
+            --ks "$KEYSTORE" \
             --ks-key-alias "$keyAlias" \
             --ks-pass "pass:$storePassword" \
             --key-pass "pass:$keyPassword" \

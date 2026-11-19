@@ -53,6 +53,14 @@ export BUILD=${BUILD:-$LIMBO_ROOT/build}
 export SRC=${SRC:-$BUILD/src}
 export DEPS=${DEPS:-$LIMBO_ROOT/deps}
 
+# ---- Release signing -----------------------------------------------------
+# The keystore is *not* part of the git checkout (history was purged).  It
+# lives in the workspace next to the repository so CI can mount/provide it
+# without committing it.  Override these for a different signing identity.
+export KEYSTORE_DIR=${KEYSTORE_DIR:-$LIMBO_ROOT/keystore}
+export KEYSTORE=${KEYSTORE:-$KEYSTORE_DIR/limbo-release.jks}
+export KEYSTORE_PROPERTIES=${KEYSTORE_PROPERTIES:-$(dirname "$KEYSTORE")/keystore.properties}
+
 export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig
 export PKG_CONFIG_LIBDIR=$PKG_CONFIG_PATH
 export PKG_CONFIG_SYSROOT_DIR=

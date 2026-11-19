@@ -53,9 +53,7 @@ QEMU_VERSION
 # ---------------------------------------------------------------------------
 # Release signing
 #
-# The keystore is a published demo key and *is* tracked on purpose so that
-# other people can produce an upgrade-compatible release APK.  Never use it
-# for anything else.
+# The keystore is not committed; it lives in the workspace next to the
+# checkout (default: $LIMBO_ROOT/keystore, see scripts/env.sh).
 # ---------------------------------------------------------------------------
-!keystore/limbo-release.jks
-!keystore/keystore.properties
+/keystore/

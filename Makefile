@@ -38,8 +38,8 @@ PATCHES     := $(JNI)/patches/qemu-11.1.3
 JLIB        := $(APP_ROOT)/limbo-android-lib/src/main/jniLibs/arm64-v8a
 QEMU_JLIB   := $(APP_ROOT)/limbo-android-x86/src/main/jniLibs/arm64-v8a
 GRADLE      ?= $(LIMBO_ROOT)/gradle-8.2.1/bin/gradle
-KEYSTORE    ?= $(APP_ROOT)/keystore/limbo-release.jks
-KEYSTORE_PROPERTIES ?= $(APP_ROOT)/keystore/keystore.properties
+KEYSTORE    ?= $(LIMBO_ROOT)/keystore/limbo-release.jks
+KEYSTORE_PROPERTIES ?= $(LIMBO_ROOT)/keystore/keystore.properties
 
 STAMPS      := $(BUILD)/.stamps
 # QEMU source tree.  Defaults to the tree `make prepare` extracts into jni/;
@@ -58,8 +58,18 @@ ifneq ($(strip $(PGO_PROFILE)),)
 ifeq ($(wildcard $(PGO_PROFILE)),)
 $(error PGO_PROFILE=$(PGO_PROFILE) does not exist; pass PGO_PROFILE= to disable PGO)
 endif
-PGO_FLAGS := -fprofile-use=$(PGO_PROFILE) -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date
+# The committed profile embeds the training checkout's relative source paths.
+# Rewrite them for the current QEMU_SRC/QEMU_BUILD layout so static functions
+# still match when the repository is cloned under another name or location.
+PGO_PROFILE_DATA := $(BUILD)/qemu-pgo.profdata
+PGO_DEPS := $(PGO_PROFILE_DATA)
+PGO_FLAGS := -fprofile-use=$(PGO_PROFILE_DATA) -Wno-profile-instr-unprofiled -Wno-profile-instr-out-of-date
+
+$(PGO_PROFILE_DATA): $(PGO_PROFILE) $(APP_ROOT)/scripts/prepare-pgo-profile.sh
+	@QEMU_SRC="$(QEMU_SRC)" QEMU_BUILD="$(QEMU_BUILD)" \
+	    "$(APP_ROOT)/scripts/prepare-pgo-profile.sh" "$(PGO_PROFILE)" "$@"
 else
+PGO_DEPS :=
 PGO_FLAGS :=
 endif
 
@@ -317,13 +327,13 @@ qemu-configure: $(STAMPS)/qemu-configured
 $(STAMPS)/qemu-configured: $(STAMPS)/zlib $(STAMPS)/zstd $(STAMPS)/glib \
                 $(STAMPS)/pixman $(STAMPS)/slirp $(STAMPS)/sdl2 \
                 $(STAMPS)/iconv $(STAMPS)/ffi $(STAMPS)/prepare-qemu \
-                $(APP_ROOT)/scripts/qemu-configure.sh $(PGO_PROFILE)
+                $(APP_ROOT)/scripts/qemu-configure.sh $(PGO_DEPS)
 	@$(ENV); EXTRA_CFLAGS="$(PGO_FLAGS) $${EXTRA_CFLAGS:-}" \
 	    QEMU_SRC="$(QEMU_SRC)" \
 	    "$(APP_ROOT)/scripts/qemu-configure.sh"
 	@mkdir -p "$(STAMPS)"; touch $@
 
-qemu: $(STAMPS)/qemu-configured $(BUILD)/setjmp/libandroid-setjmp.a liblimbo
+qemu: $(STAMPS)/qemu-configured $(BUILD)/setjmp/libandroid-setjmp.a liblimbo $(PGO_DEPS)
 	@if [ ! -f "$(QEMU_BUILD)/build.ninja" ]; then \
 	    echo "== $@: $(QEMU_BUILD) is missing, reconfiguring =="; \
 	    rm -f "$(STAMPS)/qemu-configured"; \
