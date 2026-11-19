@@ -32,7 +32,11 @@ BUILD       ?= $(LIMBO_ROOT)/build
 SRC         ?= $(BUILD)/src
 JOBS        ?= $(shell nproc)
 PATCHES     := $(JNI)/patches/qemu-11.1.3
+# jniLibs layout mirrors upstream Limbo: the library module ships the
+# dependencies and liblimbo.so, the guest module ships libqemu-system-*.so
+# (and libqemu-img.so, which is part of the same QEMU build).
 JLIB        := $(APP_ROOT)/limbo-android-lib/src/main/jniLibs/arm64-v8a
+QEMU_JLIB   := $(APP_ROOT)/limbo-android-x86/src/main/jniLibs/arm64-v8a
 GRADLE      ?= $(LIMBO_ROOT)/gradle-8.2.1/bin/gradle
 KEYSTORE    ?= $(APP_ROOT)/keystore/limbo-release.jks
 KEYSTORE_PROPERTIES ?= $(APP_ROOT)/keystore/keystore.properties
@@ -334,15 +338,15 @@ qemu: $(STAMPS)/qemu-configured $(BUILD)/setjmp/libandroid-setjmp.a liblimbo
 	@$(ENV); EXTRA_LDFLAGS="$(PGO_FLAGS) $${EXTRA_LDFLAGS:-}" \
 	    python3 "$(APP_ROOT)/scripts/link-qemu-so.py" \
 	    "$(QEMU_BUILD)" qemu-img libqemu-img.so
-	@mkdir -p "$(JLIB)"
-	@mv -f "$(QEMU_BUILD)/libqemu-system-x86_64.so" "$(JLIB)/"
-	@mv -f "$(QEMU_BUILD)/libqemu-img.so" "$(JLIB)/"
+	@mkdir -p "$(QEMU_JLIB)"
+	@mv -f "$(QEMU_BUILD)/libqemu-system-x86_64.so" "$(QEMU_JLIB)/"
+	@mv -f "$(QEMU_BUILD)/libqemu-img.so" "$(QEMU_JLIB)/"
 	@$(ENV); "$$STRIP" --strip-unneeded \
-	    "$(JLIB)/libqemu-system-x86_64.so" "$(JLIB)/libqemu-img.so"
+	    "$(QEMU_JLIB)/libqemu-system-x86_64.so" "$(QEMU_JLIB)/libqemu-img.so"
 	@$(ENV); "$(APP_ROOT)/scripts/fix-needed.sh" \
-	    "$(JLIB)/libqemu-system-x86_64.so" "$(JLIB)/libqemu-img.so"
-	@echo "== jniLibs =="
-	@ls -l "$(JLIB)"/libqemu-*.so
+	    "$(QEMU_JLIB)/libqemu-system-x86_64.so" "$(QEMU_JLIB)/libqemu-img.so"
+	@echo "== jniLibs (guest module) =="
+	@ls -l "$(QEMU_JLIB)"/libqemu-*.so
 
 liblimbo:
 	@$(ENV); "$(APP_ROOT)/scripts/build-limbo.sh"
@@ -353,7 +357,9 @@ jnilibs: deps
 	@$(ENV); "$(APP_ROOT)/scripts/sync-jnilibs.sh"
 
 native: prepare setjmp deps liblimbo qemu jnilibs
-	@echo "native libraries are ready in $(JLIB)"
+	@echo "native libraries are ready:"
+	@echo "  $(JLIB)   (deps + liblimbo.so)"
+	@echo "  $(QEMU_JLIB) (libqemu-system-x86_64.so, libqemu-img.so)"
 
 # ---------------------------------------------------------------------------
 # APK
@@ -387,7 +393,7 @@ clean-qemu:
 	@rm -f "$(STAMPS)/qemu-configured"
 
 clean-jnilibs:
-	@rm -rf "$(JLIB)"
+	@rm -rf "$(JLIB)" "$(QEMU_JLIB)"
 
 distclean: clean clean-qemu clean-jnilibs
 	@rm -rf "$(BUILD)/.stamps" "$(BUILD)"/*-build "$(BUILD)/config-meson.cross" \

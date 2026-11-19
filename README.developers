@@ -11,10 +11,18 @@ QEMU 5.1.0 integration to **QEMU 11.1.3** for arm64-v8a devices:
   * `libqemu-img.so`            – the block layer, used to create disk images
   * `liblimbo.so`               – JNI control plane + callbacks QEMU/SDL need
   * glib/pixman/SDL2/libslirp/libffi/zlib-ng/zstd/pcre2/libiconv – cross-built
-    dependencies shipped in `jniLibs/arm64-v8a`
+    dependencies shipped in the library module's `jniLibs/arm64-v8a`
 
 Only arm64-v8a is supported.  QEMU is built as a normal executable with meson
 and then re-linked as a shared object; the app loads it at runtime.
+
+The directory layout intentionally follows upstream Limbo's README.developers:
+the source trees live under `limbo-android-lib/src/main/jni/`, the library
+module's `jniLibs/` carries the dependencies plus `liblimbo.so`, and the guest
+module's `jniLibs/` carries the `libqemu-system-*.so` build.  The difference is
+that this fork keeps the tarballs, install prefix and build trees in `deps/`,
+`prebuilt/` and `build/` next to the repository instead of building inside
+`jni/`, and drives everything with one Makefile (upstream uses ndk-build).
 
 The QEMU source tree is **not** committed.  All local changes are a patch
 series under `limbo-android-lib/src/main/jni/patches/qemu-11.1.3/`, applied by
@@ -50,7 +58,7 @@ anywhere, but `deps/`, `build/` and `prebuilt/` sit next to it by default):
     ├── envsetup.sh              # interactive shell helper
     ├── deps/                    # source tarballs (see §5)
     ├── prebuilt/arm64-v8a/      # cross-built dependencies (PREFIX)
-    ├── build/                   # native build trees and build outputs
+    ├── build/                   # build trees, extracted extra sources, logs
     ├── android-ndk-r30/
     ├── android-sdk/
     ├── jdk-17/
@@ -59,11 +67,18 @@ anywhere, but `deps/`, `build/` and `prebuilt/` sit next to it by default):
         ├── Makefile             # native + APK build
         ├── scripts/             # build scripts used by the Makefile
         ├── keystore/            # release signing key (see §9)
-        └── limbo-android-lib/src/main/jni/
-            ├── patches/qemu-11.1.3/   # QEMU patch series
-            ├── patches/setjmp-aarch64/# bionic sigsetjmp replacement
-            ├── limbo/, compat/        # liblimbo.so sources
-            ├── qemu/ glib/ pixman/ SDL2/ libffi/  # extracted sources (ignored)
+        ├── limbo-android-lib/src/main/
+        │   ├── jni/             # like upstream:
+        │   │   ├── qemu/ glib/ pixman/ SDL2/ libffi/  # extracted sources (ignored)
+        │   │   ├── compat/ limbo/                     # liblimbo.so sources
+        │   │   └── patches/     # QEMU 11.1.3 series + setjmp-aarch64
+        │   └── jniLibs/arm64-v8a/        # deps + liblimbo.so (built, ignored)
+        └── limbo-android-x86/src/main/jniLibs/arm64-v8a/
+                                     # libqemu-system-x86_64.so, libqemu-img.so
+
+Upstream downloads its tarballs straight into `jni/`; here they are fetched
+into `deps/` so the git checkout stays clean, and the additional dependencies
+(zlib-ng, zstd, pcre2, libiconv, libslirp) are extracted under `build/src/`.
 
 If your layout differs, pass `LIMBO_ROOT=`, `PREFIX=`, `BUILD=` or `DEPS=` to
 make.  `scripts/env.sh` derives everything from its own location and honours
@@ -241,10 +256,10 @@ All targets are in the app-level `Makefile`:
     make prepare      extract sources, apply QEMU patches, generate cross file
     make deps         zlib-ng -> zstd -> pcre2 -> libiconv -> libffi -> glib
                       -> pixman -> libslirp -> SDL2, installed into $PREFIX
-    make liblimbo     jni/limbo + jni/compat -> jniLibs/arm64-v8a/liblimbo.so
-    make qemu         QEMU configure + ninja + re-link -> libqemu-system-*.so
+    make liblimbo     jni/limbo + jni/compat -> lib module jniLibs/liblimbo.so
+    make qemu         QEMU configure + ninja + re-link -> guest module jniLibs
     make native       all of the above
-    make jnilibs      copy the dependency .so files into jniLibs
+    make jnilibs      copy the dependency .so files into the lib module jniLibs
     make apk          release APK (see §9)
     make apk-debug    debug APK
 
@@ -265,7 +280,8 @@ Manual equivalents, if you want to see what the Makefile does:
     python3 scripts/link-qemu-so.py build/qemu-build \
         qemu-system-x86_64 libqemu-system-x86_64.so
     python3 scripts/link-qemu-so.py build/qemu-build qemu-img libqemu-img.so
-    scripts/fix-needed.sh jniLibs/arm64-v8a/libqemu-*.so
+    scripts/fix-needed.sh limbo-android-x86/src/main/jniLibs/arm64-v8a/libqemu-*.so
+    # (`make qemu` does the move and fix-needed for you)
 
 QEMU is configured through its own `configure` (it generates
 `config-host.mak`, the target list and the meson cross file).  The important
@@ -375,12 +391,20 @@ files as `libglib-2.0.so`, `libpixman-1.so`, ...  `scripts/fix-needed.sh`
 renames the `DT_NEEDED` entries with patchelf after linking (and
 `scripts/sync-jnilibs.sh` copies the real files under the packaged names).
 
-`jniLibs/arm64-v8a/` after a build:
+`jniLibs` after a build (same split as upstream Limbo):
 
-    libSDL2.so libffi.so libgio-2.0.so libglib-2.0.so libgmodule-2.0.so
-    libgobject-2.0.so libiconv.so libintl.so liblimbo.so libpcre2-8.so
-    libpixman-1.so libqemu-img.so libqemu-system-x86_64.so libslirp.so
-    libz.so libzstd.so
+    limbo-android-lib/src/main/jniLibs/arm64-v8a/
+        libSDL2.so libffi.so libgio-2.0.so libglib-2.0.so libgmodule-2.0.so
+        libgobject-2.0.so libiconv.so libintl.so liblimbo.so libpcre2-8.so
+        libpixman-1.so libslirp.so libz.so libzstd.so
+
+    limbo-android-x86/src/main/jniLibs/arm64-v8a/
+        libqemu-img.so libqemu-system-x86_64.so
+
+Gradle merges both directories into the APK, so the app still finds every
+library in its `nativeLibraryDir`.  `libqemu-img.so` lives next to the QEMU
+system library because it is produced by the same QEMU build; `liblimbo.so`
+dlopen()s it at runtime.
 
 `libcompat-limbo.so` no longer exists; its two exported entry points
 (`set_jni`, `Android_JNI_SetVMResolution`, plus `FileUtils.nativeAddFd`) are
@@ -472,7 +496,8 @@ On MIUI, `adb install` is often rejected; use:
     app's lib directory in `LD_LIBRARY_PATH`.
   * The emulator refuses to start if `libqemu-system-*.so` cannot be dlopen'ed:
     check `DT_NEEDED` with `llvm-readelf -d` and make sure every dependency is
-    present in `jniLibs/arm64-v8a` under the packaged name.
+    present under the packaged name in the APK (dependencies come from the
+    library module's jniLibs, QEMU from the guest module's jniLibs).
   * `zipalign -c -P 16 4 app.apk` must print "Verification successful".
 
 
