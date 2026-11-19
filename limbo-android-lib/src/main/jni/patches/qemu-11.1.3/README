@@ -68,6 +68,8 @@ compatibility changes use `__ANDROID__` where possible.
 
 Notes
 -----
+* The series applies with either GNU `patch -p1` or `git apply`.  New files
+  carry `new file mode` headers, so `git apply` creates them correctly.
 * Applying the series to a clean tarball must reproduce the working tree
   bit-for-bit.  If you change jni/qemu, regenerate the corresponding patch
   (see README.developers §6) and re-verify.

@@ -1,5 +1,6 @@
 diff --git a/audio/aaudioaudio.c b/audio/aaudioaudio.c
---- a/audio/aaudioaudio.c
+new file mode 100644
+--- /dev/null
 +++ b/audio/aaudioaudio.c
 @@ -0,0 +1,598 @@
 +/*
@@ -601,7 +602,8 @@ diff --git a/audio/aaudioaudio.c b/audio/aaudioaudio.c
 +DEFINE_TYPES(audio_types)
 +module_obj(TYPE_AUDIO_AAUDIO)
 diff --git a/audio/openslesaudio.c b/audio/openslesaudio.c
---- a/audio/openslesaudio.c
+new file mode 100644
+--- /dev/null
 +++ b/audio/openslesaudio.c
 @@ -0,0 +1,781 @@
 +/*

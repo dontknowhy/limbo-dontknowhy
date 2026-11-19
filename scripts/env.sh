@@ -24,7 +24,7 @@ export JNI_ROOT=$APP_ROOT/limbo-android-lib/src/main/jni
 export NDK_ROOT=${NDK_ROOT:-$LIMBO_ROOT/android-ndk-r30}
 export NDK=$NDK_ROOT
 export TOOLCHAIN=$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64
-export API=${API:-21}                 # keep in sync with minSdkVersion
+export API=${API:-29}                 # keep in sync with minSdkVersion (29 = Android 10, needed for ELF TLS)
 export ABI=${ABI:-arm64-v8a}
 export TRIPLE=${TRIPLE:-aarch64-linux-android}
 export CROSS_PREFIX=$TRIPLE-
@@ -115,6 +115,7 @@ export PATCHELF
 export SETJMP_DIR=$BUILD/setjmp
 export SETJMP_LIB=$SETJMP_DIR/libandroid-setjmp.a
 
-# Location of the QEMU build directory (full-LTO release build).
-export QEMU_SRC=$JNI_ROOT/qemu
+# QEMU source tree and build directory (full-LTO release build by default).
+# QEMU_SRC can point at a pristine/patched git checkout instead of jni/qemu.
+export QEMU_SRC=${QEMU_SRC:-$JNI_ROOT/qemu}
 export QEMU_BUILD=${QEMU_BUILD:-$BUILD/qemu-build}

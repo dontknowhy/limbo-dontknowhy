@@ -38,6 +38,11 @@ KEYSTORE    ?= $(APP_ROOT)/keystore/limbo-release.jks
 KEYSTORE_PROPERTIES ?= $(APP_ROOT)/keystore/keystore.properties
 
 STAMPS      := $(BUILD)/.stamps
+# QEMU source tree.  Defaults to the tree `make prepare` extracts into jni/;
+# point it at a git checkout (e.g. QEMU_SRC=$LIMBO_ROOT/qemu) to build from
+# version-controlled sources instead.  Use a separate QEMU_BUILD per source
+# tree and delete the qemu-configured stamp when switching.
+QEMU_SRC    ?= $(JNI)/qemu
 QEMU_BUILD  ?= $(BUILD)/qemu-build
 
 # Profile-guided optimisation.  The checked-in profile was trained on the
@@ -310,6 +315,7 @@ $(STAMPS)/qemu-configured: $(STAMPS)/zlib $(STAMPS)/zstd $(STAMPS)/glib \
                 $(STAMPS)/iconv $(STAMPS)/ffi $(STAMPS)/prepare-qemu \
                 $(APP_ROOT)/scripts/qemu-configure.sh $(PGO_PROFILE)
 	@$(ENV); EXTRA_CFLAGS="$(PGO_FLAGS) $${EXTRA_CFLAGS:-}" \
+	    QEMU_SRC="$(QEMU_SRC)" \
 	    "$(APP_ROOT)/scripts/qemu-configure.sh"
 	@mkdir -p "$(STAMPS)"; touch $@
 

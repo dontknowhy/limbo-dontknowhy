@@ -34,7 +34,8 @@ cpu = 'aarch64'
 endian = 'little'
 
 [built-in options]
-c_args = ['-O3', '-fPIC', '-march=armv8-a+simd+crc+crypto', '-DANDROID', '-D__ANDROID__', '-D__LIMBO__']
+c_args = ['-O3', '-fPIC', '-march=armv8-a+simd+crc+crypto', '-DANDROID', '-D__ANDROID__', '-D__LIMBO__', '-I$PREFIX/include']
+cpp_args = ['-O3', '-fPIC', '-march=armv8-a+simd+crc+crypto', '-DANDROID', '-D__ANDROID__', '-D__LIMBO__', '-I$PREFIX/include']
 c_link_args = ['-L$PREFIX/lib', '-Wl,-rpath-link,$PREFIX/lib']
 c_std = 'gnu11'
 EOF

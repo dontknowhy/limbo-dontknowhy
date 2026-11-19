@@ -205,7 +205,8 @@ diff --git a/util/oslib-posix.c b/util/oslib-posix.c
  
  struct MemsetThread;
 diff --git a/util/limbo-openpty.c b/util/limbo-openpty.c
---- a/util/limbo-openpty.c
+new file mode 100644
+--- /dev/null
 +++ b/util/limbo-openpty.c
 @@ -0,0 +1,55 @@
 +/*

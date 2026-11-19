@@ -37,7 +37,7 @@ public class Machine extends Observable {
     private String arch;
     private String machineType;
     private String cpu = "Haswell";
-    private int cpuNum = 4;
+    private int cpuNum = 2; // 2 vCPU MTTCG: same boot speed as 4, fewer invalidations/heat
     private int memory = 2048;
     private int enableMTTCG = 1;
     private int enableKVM;
