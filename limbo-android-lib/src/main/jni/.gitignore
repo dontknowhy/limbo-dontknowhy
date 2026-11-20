@@ -25,3 +25,13 @@ qemu-2.11.0
 /libffi
 /pixman
 /SDL2
+
+# Dependency tarballs (scripts/fetch-deps.sh) and the trees they extract into.
+/*.tar.xz
+/*.tar.gz
+/zlib-ng-2.3.3
+/zstd-1.5.7
+/pcre2-10.49
+/libiconv-1.18
+/libslirp-4.9.7
+/libslirp-v4.9.7

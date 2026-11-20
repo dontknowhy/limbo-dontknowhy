@@ -27,8 +27,8 @@ glib/pixman being picked up produces binaries that link on the host and fail on 
 
 ## `make prepare`
 
-- Extracts QEMU/glib/pixman/SDL2/libffi into `jni/` and zlib-ng/zstd/pcre2/libiconv/
-  libslirp into `build/src/`.
+- Extracts every tarball (QEMU/glib/pixman/SDL2/libffi plus zlib-ng/zstd/pcre2/
+  libiconv/libslirp) into `jni/`, next to the tarballs.
 - Applies `jni/patches/qemu-11.1.3/*.patch` in order; it first reverse-dry-runs patch
   0001 to detect an already-patched tree, so rerunning is safe.
 - Generates `build/config-meson.cross` for the meson dependencies.

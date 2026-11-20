@@ -3,7 +3,9 @@
 #
 #   scripts/fetch-deps.sh
 #
-# The workspace normally already ships deps/, this is only for fresh clones.
+# Downloads land in $DEPS, which defaults to the repository's jni/ directory
+# (see scripts/env.sh), so the tarballs sit next to the trees extracted from
+# them.  Re-running is cheap: existing files are skipped.
 # Set HTTP_PROXY/HTTPS_PROXY or GH_PROXY (e.g. https://gh-proxy.org/) if
 # GitHub is not reachable directly.
 set -euo pipefail

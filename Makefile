@@ -15,7 +15,7 @@
 #   make distclean      remove native build dirs and jniLibs as well
 #
 # Useful overrides (also honoured by scripts/env.sh):
-#   LIMBO_ROOT=/path/to/workspace   DEPS=/path/to/deps   PREFIX=...   BUILD=...
+#   LIMBO_ROOT=/path/to/workspace   DEPS=/path/to/tarballs   PREFIX=...   BUILD=...
 #   JOBS=8   NDK_ROOT=...   ANDROID_HOME=...
 #
 # See README.developers for prerequisites and the whole story.
@@ -26,10 +26,12 @@ SHELL := /bin/bash
 APP_ROOT    := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 LIMBO_ROOT  ?= $(abspath $(APP_ROOT)/..)
 JNI         := $(APP_ROOT)/limbo-android-lib/src/main/jni
-DEPS        ?= $(LIMBO_ROOT)/deps
+# Third-party tarballs and their extracted trees all live in jni/ so the whole
+# dependency set is in one place (jni/.gitignore keeps it out of git).
+DEPS        ?= $(JNI)
 PREFIX      ?= $(LIMBO_ROOT)/prebuilt/arm64-v8a
 BUILD       ?= $(LIMBO_ROOT)/build
-SRC         ?= $(BUILD)/src
+SRC         ?= $(JNI)
 JOBS        ?= $(shell nproc)
 PATCHES     := $(JNI)/patches/qemu-11.1.3
 # jniLibs layout mirrors upstream Limbo: the library module ships the
@@ -171,7 +173,7 @@ $(STAMPS)/cross-file:
 	@$(ENV); "$(APP_ROOT)/scripts/gen-cross-file.sh" "$(BUILD)/config-meson.cross"
 	@touch $@
 
-# Tarballs that are not in the workspace deps/ dir by default.
+# Tarballs are downloaded into $(DEPS) (default: jni/).
 deps-fetch:
 	@$(ENV); "$(APP_ROOT)/scripts/fetch-deps.sh"
 
@@ -408,5 +410,8 @@ clean-jnilibs:
 distclean: clean clean-qemu clean-jnilibs
 	@rm -rf "$(BUILD)/.stamps" "$(BUILD)"/*-build "$(BUILD)/config-meson.cross" \
 	    "$(BUILD)/setjmp" "$(BUILD)/toolchain-prefix"
-	@rm -rf "$(JNI)/qemu" "$(JNI)/glib" "$(JNI)/pixman" "$(JNI)/SDL2" "$(JNI)/libffi"
+	@rm -rf "$(JNI)/qemu" "$(JNI)/glib" "$(JNI)/pixman" "$(JNI)/SDL2" \
+	    "$(JNI)/libffi" "$(JNI)/zlib-ng-2.3.3" "$(JNI)/zstd-1.5.7" \
+	    "$(JNI)/pcre2-10.49" "$(JNI)/libiconv-1.18" \
+	    "$(JNI)/libslirp-4.9.7" "$(JNI)/libslirp-v4.9.7"
 	@echo "removed native build dirs and extracted sources"

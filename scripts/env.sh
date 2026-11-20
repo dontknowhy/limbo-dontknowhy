@@ -13,8 +13,9 @@ _SELF=${BASH_SOURCE[0]:-$0}
 APP_ROOT=$(cd "$(dirname "$_SELF")/.." && pwd)
 export APP_ROOT
 
-# Workspace root: the parent of the app repo.  It holds deps/, build/ and
-# prebuilt/ (see README.developers).
+# Workspace root: the parent of the app repo.  It holds build/ and prebuilt/
+# (see README.developers); dependency tarballs and sources live in the repo's
+# jni/ directory.
 export LIMBO_ROOT=${LIMBO_ROOT:-$(dirname "$APP_ROOT")}
 
 export LIMBO_SRC=$APP_ROOT
@@ -50,8 +51,9 @@ export CMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake
 # the final renamed copies.
 export PREFIX=${PREFIX:-$LIMBO_ROOT/prebuilt/arm64-v8a}
 export BUILD=${BUILD:-$LIMBO_ROOT/build}
-export SRC=${SRC:-$BUILD/src}
-export DEPS=${DEPS:-$LIMBO_ROOT/deps}
+# Dependency tarballs and extracted third-party sources live together in jni/.
+export SRC=${SRC:-$JNI_ROOT}
+export DEPS=${DEPS:-$JNI_ROOT}
 
 # ---- Release signing -----------------------------------------------------
 # The keystore is *not* part of the git checkout (history was purged).  It

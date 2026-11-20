@@ -68,7 +68,7 @@ patch), then verify.
 
 ```bash
 cd /tmp && rm -rf qemu-pristine && mkdir qemu-pristine
-tar -xf "$LIMBO_ROOT/deps/qemu-11.1.3.tar.xz" -C qemu-pristine --strip-components=1
+tar -xf "$JNI_ROOT/qemu-11.1.3.tar.xz" -C qemu-pristine --strip-components=1
 cd qemu-pristine
 for p in "$JNI_ROOT"/patches/qemu-11.1.3/*.patch; do patch -p1 < "$p"; done
 # or: git init && git add -A && for p in ...; do git apply "$p"; done
@@ -85,4 +85,4 @@ Rules:
   preserve them on a fresh clone and the diff is invisible to review.
 - `patches/qemu-11.1.3/README` mirrors the topic list above; update it when adding a
   patch.
-- The series is against `deps/qemu-11.1.3.tar.xz` (sha256 in `scripts/fetch-deps.sh`).
+- The series is against `jni/qemu-11.1.3.tar.xz` (sha256 in `scripts/fetch-deps.sh`).

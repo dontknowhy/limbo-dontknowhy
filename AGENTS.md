@@ -2,8 +2,9 @@
 
 Limbo 的 Android 前端 + QEMU 11.1.3 原生构建系统。QEMU 源码不在本仓库：所有改动是
 `limbo-android-lib/src/main/jni/patches/qemu-11.1.3/*.patch`。原生构建由根 `Makefile`
-驱动（不是 ndk-build）；`deps/`、`build/`、`prebuilt/` 位于仓库上一级工作区
-（`LIMBO_ROOT`，默认 `..`）。
+驱动（不是 ndk-build）；`build/`、`prebuilt/` 位于仓库上一级工作区
+（`LIMBO_ROOT`，默认 `..`），依赖 tarball 与解压后的源码统一放在仓库内
+`limbo-android-lib/src/main/jni/`（gitignore）。
 
 ## TOC
 
@@ -19,8 +20,9 @@ Limbo 的 Android 前端 + QEMU 11.1.3 原生构建系统。QEMU 源码不在本
 
 - 仅支持 `arm64-v8a`；`minSdk`/`targetSdk` 29，`compileSdk` 31，applicationId
   `com.limbo.emu.dontknowhy`。`scripts/env.sh` 的 `API=29` 必须与之一致（ELF TLS 需要）。
-- 不入库：`jniLibs/**/*.so`、`jni/{qemu,glib,pixman,SDL2,libffi}`、`build/`、
-  `deps/` 与 keystore。不要提交二进制或解压后的源码。
+- 不入库：`jniLibs/**/*.so`、`jni/{qemu,glib,pixman,SDL2,libffi}`、`jni/*.tar.*`、
+  `jni/{zlib-ng-*,zstd-*,pcre2-*,libiconv-*,libslirp-*}`、`build/` 与 keystore。
+  不要提交二进制或解压后的源码。
 - 工作区级规则在 `../AGENTS.md`，进度/决策记录在 `../memo.md`；两者不在本 git 仓库内。
   `README.developers` 是构建/打包/调试的权威长文，本文只保留 agent 最容易踩错的部分。
 - QEMU 改动的唯一权威记录是 patch 系列。不要改完 `jni/qemu` 就留在那里，见
@@ -32,7 +34,7 @@ Limbo 的 Android 前端 + QEMU 11.1.3 原生构建系统。QEMU 源码不在本
 shell 需要 `source ../envsetup.sh`。
 
 ```bash
-make deps-fetch      # 下载 tarball 到 ../deps 并校验 sha256（GitHub 可设 GH_PROXY）
+make deps-fetch      # 下载 tarball 到 jni/ 并校验 sha256（GitHub 可设 GH_PROXY）
 make native          # prepare + setjmp + deps + liblimbo + qemu + jnilibs
 make apk             # release APK（缺 keystore 时先 make keystore）
 make apk-debug       # debug-signed，迭代 UI 用这个

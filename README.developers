@@ -17,12 +17,12 @@ Only arm64-v8a is supported.  QEMU is built as a normal executable with meson
 and then re-linked as a shared object; the app loads it at runtime.
 
 The directory layout intentionally follows upstream Limbo's README.developers:
-the source trees live under `limbo-android-lib/src/main/jni/`, the library
-module's `jniLibs/` carries the dependencies plus `liblimbo.so`, and the guest
-module's `jniLibs/` carries the `libqemu-system-*.so` build.  The difference is
-that this fork keeps the tarballs, install prefix and build trees in `deps/`,
-`prebuilt/` and `build/` next to the repository instead of building inside
-`jni/`, and drives everything with one Makefile (upstream uses ndk-build).
+all third-party tarballs and the trees extracted from them live under
+`limbo-android-lib/src/main/jni/`, the library module's `jniLibs/` carries the
+dependencies plus `liblimbo.so`, and the guest module's `jniLibs/` carries the
+`libqemu-system-*.so` build.  Only the install prefix and the out-of-tree build
+directories live outside the repository (`prebuilt/` and `build/`), and
+everything is driven by one Makefile (upstream uses ndk-build).
 
 The QEMU source tree is **not** committed.  All local changes are a patch
 series under `limbo-android-lib/src/main/jni/patches/qemu-11.1.3/`, applied by
@@ -52,13 +52,12 @@ Android toolchain:
     Gradle 8.2.1
 
 The workspace used for development looks like this (the app repo may live
-anywhere, but `deps/`, `build/` and `prebuilt/` sit next to it by default):
+anywhere, but `build/` and `prebuilt/` sit next to it by default):
 
     limbo/                       # workspace root (LIMBO_ROOT)
     ├── envsetup.sh              # interactive shell helper
-    ├── deps/                    # source tarballs (see §5)
     ├── prebuilt/arm64-v8a/      # cross-built dependencies (PREFIX)
-    ├── build/                   # build trees, extracted extra sources, logs
+    ├── build/                   # out-of-tree build trees and logs
     ├── android-ndk-r30/
     ├── android-sdk/
     ├── jdk-17/
@@ -68,17 +67,20 @@ anywhere, but `deps/`, `build/` and `prebuilt/` sit next to it by default):
         ├── Makefile             # native + APK build
         ├── scripts/             # build scripts used by the Makefile
         ├── limbo-android-lib/src/main/
-        │   ├── jni/             # like upstream:
-        │   │   ├── qemu/ glib/ pixman/ SDL2/ libffi/  # extracted sources (ignored)
+        │   ├── jni/             # tarballs + extracted third-party sources
+        │   │   ├── *.tar.xz *.tar.gz   # downloaded tarballs (ignored)
+        │   │   ├── qemu/ glib/ pixman/ SDL2/ libffi/
+        │   │   ├── zlib-ng-*/ zstd-*/ pcre2-*/ libiconv-*/ libslirp-*/  (ignored)
         │   │   ├── compat/ limbo/                     # liblimbo.so sources
         │   │   └── patches/     # QEMU 11.1.3 series + setjmp-aarch64
         │   └── jniLibs/arm64-v8a/        # deps + liblimbo.so (built, ignored)
         └── limbo-android-x86/src/main/jniLibs/arm64-v8a/
                                      # libqemu-system-x86_64.so, libqemu-img.so
 
-Upstream downloads its tarballs straight into `jni/`; here they are fetched
-into `deps/` so the git checkout stays clean, and the additional dependencies
-(zlib-ng, zstd, pcre2, libiconv, libslirp) are extracted under `build/src/`.
+`scripts/fetch-deps.sh` downloads every tarball into `jni/`, and the Makefile
+extracts all of them there too (QEMU/glib/pixman/SDL2/libffi plus the extra
+zlib-ng/zstd/pcre2/libiconv/libslirp trees).  `jni/.gitignore` keeps both the
+tarballs and the extracted trees out of git.
 
 If your layout differs, pass `LIMBO_ROOT=`, `PREFIX=`, `BUILD=` or `DEPS=` to
 make.  `scripts/env.sh` derives everything from its own location and honours
@@ -91,7 +93,7 @@ interactive shells:
 3. Quick start
 --------------------------------------------------------------------------------
 
-    # one-time: fetch tarballs if deps/ is empty
+    # one-time: fetch tarballs into jni/ (files that already exist are skipped)
     make -C limbo-dontknowhy deps-fetch
 
     # build everything and produce a signed release APK
@@ -161,12 +163,12 @@ over computed gotos, not affine loop nests).  `.text` shrank only 1.3%.  It is
 therefore not enabled.
 
 
-5. Source tarballs (`deps/`)
+5. Source tarballs (`jni/`)
 --------------------------------------------------------------------------------
 
-The build extracts sources into `jni/` (QEMU/glib/pixman/SDL2/libffi) and
-`build/src/` (the rest).  `scripts/fetch-deps.sh` downloads whatever is
-missing and verifies sha256:
+`scripts/fetch-deps.sh` downloads whatever is missing into `jni/` and verifies
+sha256; `make prepare` / `make deps` extract the tarballs into the same
+directory, so all dependency sources are in one place:
 
     qemu-11.1.3.tar.xz        https://download.qemu.org/
     glib-2.90.1.tar.xz        https://download.gnome.org/sources/glib/2.90/
@@ -241,11 +243,11 @@ switches stacks/threads.  `scripts/link-qemu-so.py` links it with
 
 Regenerating the patches after changing `jni/qemu`:
 
-    cd /tmp && rm -rf qemu-pristine && tar -xf $LIMBO_ROOT/deps/qemu-11.1.3.tar.xz
+    cd /tmp && rm -rf qemu-pristine && tar -xf $JNI_ROOT/qemu-11.1.3.tar.xz
     # ... create the per-topic diffs, then verify they apply cleanly:
-    cd /tmp/qemu-pristine && for p in $JNI/patches/qemu-11.1.3/*.patch; do
+    cd /tmp/qemu-pristine && for p in $JNI_ROOT/patches/qemu-11.1.3/*.patch; do
         patch -p1 < "$p"; done
-    # the result must be identical to $JNI/qemu
+    # the result must be identical to $JNI_ROOT/qemu
 
 
 7. Build
