@@ -126,7 +126,7 @@ The historical entry point still works:
     libslirp      4.9.7
     proxy-libintl 0.5         (glib subproject, built by glib)
     NDK           r30 / clang 21
-    API           21 (minSdk), targetSdk 29
+    API           29 (minSdk and targetSdk; ELF TLS needs it)
     ABI           arm64-v8a
 
 Compile flags are pure armv8-a plus the optional extensions:
@@ -214,8 +214,8 @@ No host library is ever picked up: the meson cross files set
     0004-android-audio-backends.patch
         Native OpenSL ES and AAudio audio backends (`audio/openslesaudio.c`,
         `audio/aaudioaudio.c`, QAPI definitions, meson probes).  AAudio is
-        loaded with dlopen("libaaudio.so") so the library still loads on
-        API 21.  Both are output+input (microphone capture works).
+        loaded with dlopen("libaaudio.so") rather than linked, so it adds no
+        DT_NEEDED entry.  Both are output+input (microphone capture works).
 
     0005-qemu-img-inprocess.patch
         `limbo_img_create()`: calls bdrv_create() directly so the app can
@@ -417,6 +417,12 @@ part of `liblimbo.so`, which only needs liblog/libdl/libc.
     zipalign -P 16 -f 4 ...                          # 16 KB alignment
     apksigner sign --ks "$KEYSTORE" ...
     zipalign -c -P 16 4 ... ; apksigner verify ...
+
+`lintVitalRelease` still reports `ExpiredTargetSdkVersion` ("Google Play
+requires that apps target API level 31 or higher") and prints `1 errors`, but
+`lint { abortOnError false }` in `limbo-android-x86/build.gradle` keeps that
+from failing the build.  targetSdk 29 is intentional (§10), so the message is
+expected and harmless.
 
 Native libraries are stored **uncompressed** (`useLegacyPackaging = false`).
 Android 15+ requires uncompressed `.so` files to be 16 KB aligned inside the

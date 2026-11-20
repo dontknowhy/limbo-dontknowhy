@@ -88,8 +88,8 @@ run that did not happen. Verify proportionally:
 
 - A new build command, a new mandatory check, a new patch topic or a pitfall that will
   recur earns 1–2 sentences in the matching `AGENTS.md` section or `docs/agents/*.md`.
-- A statement that no longer matches the code is corrected immediately. Example already
-  fixed here: `minSdk` is 29, not the “API 21” the old README repeats.
+- A statement that no longer matches the code is corrected immediately. Example: the
+  NDK target API is 29 (`scripts/env.sh`), which has to match `minSdk` (29).
 - Documentation records current behaviour, never the history of a change: “the build does
   X”, not “I fixed X”. The same rule governs commit messages and code comments.
 - Commit messages in this repo are short, Chinese, statement-style. Do not copy the

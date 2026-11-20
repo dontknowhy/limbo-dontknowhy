@@ -18,8 +18,7 @@ Limbo 的 Android 前端 + QEMU 11.1.3 原生构建系统。QEMU 源码不在本
 ## 快速事实
 
 - 仅支持 `arm64-v8a`；`minSdk`/`targetSdk` 29，`compileSdk` 31，applicationId
-  `com.limbo.emu.dontknowhy`。`README.developers` 里“API 21”是旧描述，`scripts/env.sh`
-  的 `API=29` 才是实际值（ELF TLS 需要）。
+  `com.limbo.emu.dontknowhy`。`scripts/env.sh` 的 `API=29` 必须与之一致（ELF TLS 需要）。
 - 不入库：`jniLibs/**/*.so`、`jni/{qemu,glib,pixman,SDL2,libffi}`、`build/`、
   `deps/` 与 keystore。不要提交二进制或解压后的源码。
 - 工作区级规则在 `../AGENTS.md`，进度/决策记录在 `../memo.md`；两者不在本 git 仓库内。
