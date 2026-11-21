@@ -256,7 +256,7 @@ The device build is plain clang from `envsetup.sh` (no meson, no ndk-build):
 
 ```
 --sysroot=$SYSROOT -march=armv8-a+simd+crc+crypto -mtune=cortex-a76 -O3 -fPIC
--D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__ -DCONFIG_LINUX
+-D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__
 -I jni/compat -include limbo_logutils.h -Wall -Wextra
 -fvisibility=hidden -ffunction-sections -fdata-sections
 ```

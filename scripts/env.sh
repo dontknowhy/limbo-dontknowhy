@@ -79,7 +79,9 @@ export CROSS_LDFLAGS="--sysroot=$SYSROOT -L$PREFIX/lib -Wl,-rpath-link,$PREFIX/l
 export CROSS_LD_16K="-Wl,-z,max-page-size=16384"
 
 # Historical names used by scripts/manual builds.
-export CFLAGS="$CROSS_CFLAGS -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__ -DCONFIG_LINUX"
+# CONFIG_LINUX comes from QEMU's generated config-host.h; also passing it on the
+# command line makes every translation unit warn (-Wmacro-redefined).
+export CFLAGS="$CROSS_CFLAGS -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__"
 export CXXFLAGS=$CFLAGS
 export CPPFLAGS=$CROSS_CPPFLAGS
 export LDFLAGS=$CROSS_LDFLAGS

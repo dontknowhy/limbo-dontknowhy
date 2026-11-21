@@ -29,7 +29,7 @@ COMMON=(
   --sysroot="$SYSROOT"
   -march=armv8-a+simd+crc+crypto -mtune=cortex-a76
   -O3 -fPIC
-  -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__ -DCONFIG_LINUX
+  -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__
   -I"$J/limbo" -I"$J/compat" -I"$J/qemu/include"
   -include "$J/compat/limbo_logutils.h"
   -Wall -Wextra -Wno-unused-parameter

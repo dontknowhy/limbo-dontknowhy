@@ -148,8 +148,10 @@ env \
     RANLIB="$RANLIB" \
     STRIP="$STRIP" \
     OBJCOPY="$OBJCOPY" \
-    CFLAGS="$CROSS_CFLAGS -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__ -DCONFIG_LINUX $EXTRA_CFLAGS" \
-    CXXFLAGS="$CROSS_CFLAGS -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__ -DCONFIG_LINUX $EXTRA_CFLAGS" \
+    # CONFIG_LINUX is defined by config-host.h; passing it again here triggers
+    # -Wmacro-redefined on every file.
+    CFLAGS="$CROSS_CFLAGS -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__ $EXTRA_CFLAGS" \
+    CXXFLAGS="$CROSS_CFLAGS -D__LIMBO__ -D__ANDROID__ -DANDROID -D__linux__ $EXTRA_CFLAGS" \
     LDFLAGS="$CROSS_LDFLAGS -liconv" \
     "$QEMU_SRC/configure" "${CONFIGURE_OPTS[@]}" "$@"
 
