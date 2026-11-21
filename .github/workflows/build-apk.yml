@@ -4,12 +4,15 @@
 # 下载、解压、打补丁、交叉编译依赖都可以跳过。
 #
 # 签名材料通过 secrets 传入，落到 $LIMBO_ROOT/keystore/（与 scripts/env.sh 的
-# 默认布局一致），package-apk.sh 会照常读取：
-#   KEYSTORE_BASE64      limbo-release.jks 的 base64（`base64 -w0` 后单行）
-#   KEYSTORE_PASSWORD    storePassword
-#   KEY_ALIAS            keyAlias（通常就是 limbo）
-#   KEY_PASSWORD         keyPassword
-# 没配置 KEYSTORE_BASE64 时自动退回 debug 签名，方便先把流程跑通。
+# 默认布局一致），package-apk.sh 会照常读取。推荐只配一个：
+#   KEYSTORE_BUNDLE_BASE64   ../keystore 整个目录的 base64 tar.gz，生成方式：
+#       tar -czf - -C ../keystore limbo-release.jks keystore.properties | base64 -w0
+# 也可以拆成四项（缺一不可）：
+#   KEYSTORE_BASE64          limbo-release.jks 的 base64
+#   KEYSTORE_PASSWORD        storePassword
+#   KEY_ALIAS                keyAlias（通常就是 limbo）
+#   KEY_PASSWORD             keyPassword
+# 两者都没配时自动退回 debug 签名，方便先把流程跑通。
 #
 # 打 v* tag 时额外创建 GitHub Release；也可以在 Actions 页面手动触发。
 name: Build APK
@@ -172,6 +175,7 @@ jobs:
       - name: Prepare signing key
         id: signing
         env:
+          KEYSTORE_BUNDLE_BASE64: ${{ secrets.KEYSTORE_BUNDLE_BASE64 }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -183,23 +187,33 @@ jobs:
           if [ "${WANT_DEBUG:-false}" = "true" ]; then
             MODE=debug
           fi
-          if [ "$MODE" = release ] && [ -z "${KEYSTORE_BASE64:-}" ]; then
-            echo "::warning title=未配置签名 secret::KEYSTORE_BASE64 为空，改为构建 debug APK"
+          if [ "$MODE" = release ] &&
+             [ -z "${KEYSTORE_BUNDLE_BASE64:-}" ] &&
+             [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::warning title=未配置签名 secret::KEYSTORE_BUNDLE_BASE64 为空，改为构建 debug APK"
             MODE=debug
           fi
           if [ "$MODE" = release ]; then
             mkdir -p "$LIMBO_ROOT/keystore"
-            printf '%s' "$KEYSTORE_BASE64" | base64 -d \
-              > "$LIMBO_ROOT/keystore/limbo-release.jks"
-            # package-apk.sh 会 source 这个文件：值里不要带空格、引号、$ 等
-            # shell 元字符，否则会被 shell 展开。
-            {
-              echo "keyAlias=${KEY_ALIAS}"
-              echo "storePassword=${KEYSTORE_PASSWORD}"
-              echo "keyPassword=${KEY_PASSWORD}"
-            } > "$LIMBO_ROOT/keystore/keystore.properties"
-            chmod 600 "$LIMBO_ROOT/keystore/limbo-release.jks" \
-                       "$LIMBO_ROOT/keystore/keystore.properties"
+            if [ -n "${KEYSTORE_BUNDLE_BASE64:-}" ]; then
+              # 整个 keystore 目录（jks + keystore.properties）打成一个 tar.gz。
+              printf '%s' "$KEYSTORE_BUNDLE_BASE64" | base64 -d |
+                tar -xzf - -C "$LIMBO_ROOT/keystore"
+            else
+              printf '%s' "$KEYSTORE_BASE64" | base64 -d \
+                > "$LIMBO_ROOT/keystore/limbo-release.jks"
+              # package-apk.sh 会 source 这个文件：值里不要带空格、引号、$ 等
+              # shell 元字符，否则会被 shell 展开。
+              {
+                echo "keyAlias=${KEY_ALIAS}"
+                echo "storePassword=${KEYSTORE_PASSWORD}"
+                echo "keyPassword=${KEY_PASSWORD}"
+              } > "$LIMBO_ROOT/keystore/keystore.properties"
+            fi
+            chmod 600 "$LIMBO_ROOT/keystore"/*
+            # 缺任何一个都说明 secret 内容不对，早点失败。
+            test -f "$LIMBO_ROOT/keystore/limbo-release.jks"
+            test -f "$LIMBO_ROOT/keystore/keystore.properties"
             echo "signing key written to $LIMBO_ROOT/keystore/"
           fi
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
